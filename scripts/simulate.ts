@@ -3,9 +3,9 @@
 // The agent has no post_message here, so replies come back as its final text. Costs real tokens.
 import { spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { REPO_ROOT } from "../src/db/client.js";
+import { dataDir, REPO_ROOT } from "../src/db/client.js";
 
 type Step = [room: "field" | "office", sender: string, text: string];
 const STEPS: Step[] = [
@@ -28,6 +28,21 @@ const instructions = readFileSync(join(REPO_ROOT, "agent", "INSTRUCTIONS.md"), "
 const model = process.env.SIM_MODEL ?? "sonnet"; // the template's model
 const only = process.argv[2] ? Number(process.argv[2]) : 0; // run the first N steps
 const sessions: Record<string, string> = {};
+rmSync(join(dataDir(), "sim-room.log"), { force: true });
+const stubConfig = (room: string) =>
+  JSON.stringify({
+    mcpServers: {
+      switch: {
+        type: "stdio",
+        command: process.execPath,
+        args: [
+          join(REPO_ROOT, "node_modules", "tsx", "dist", "cli.mjs"),
+          join(REPO_ROOT, "scripts", "switch-stub.ts"),
+        ],
+        env: { SIM_ROOM: room, ORDERROOM_DATA_DIR: dataDir() },
+      },
+    },
+  });
 let cost = 0;
 for (const [i, [room, who, text]] of STEPS.entries()) {
   if (only && i >= only) break;
@@ -48,9 +63,11 @@ for (const [i, [room, who, text]] of STEPS.entries()) {
     "--model",
     model,
     "--allowedTools",
-    "mcp__orderroom",
+    "mcp__orderroom,mcp__switch",
     "--append-system-prompt",
     instructions,
+    "--mcp-config",
+    stubConfig(room),
   ];
   const sid = sessions[room];
   if (sid) args.push("--resume", sid);
@@ -75,4 +92,4 @@ for (const [i, [room, who, text]] of STEPS.entries()) {
     console.log(`!! unparsable output\n${r.stdout.slice(0, 400)}\n${(r.stderr ?? "").slice(-400)}`);
   }
 }
-console.log(`\ncost $${cost.toFixed(2)}`);
+console.log(`\ncost $${cost.toFixed(2)} · room transcript: ${join(dataDir(), "sim-room.log")}`);

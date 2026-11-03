@@ -12,6 +12,7 @@ export interface PaymentResult {
   mode: string;
   new_outstanding: number;
   oldest_due_days: number;
+  open_orders: { id: number; status: string; total: number }[];
   reply_text: string;
 }
 
@@ -49,6 +50,12 @@ export function recordPayment(
   );
   const newOut = r.outstanding - a.amount_paise;
   const due = oldestDueDays(db, { id: r.id, outstanding: newOut });
+  // Live state so the agent never repeats a stale status from memory (other rooms move orders).
+  const open = db
+    .prepare(
+      "SELECT id, status, total FROM orders WHERE retailer_id = ? AND status IN ('awaiting_confirmation','needs_approval','confirmed','packed','dispatched') ORDER BY id",
+    )
+    .all(r.id) as { id: number; status: string; total: number }[];
   return {
     data: {
       payment_id: Number(info.lastInsertRowid),
@@ -57,7 +64,13 @@ export function recordPayment(
       mode: a.mode,
       new_outstanding: newOut,
       oldest_due_days: due,
-      reply_text: `💰 Payment ${rupees(a.amount_paise)} ${a.mode} · ${r.name} · outstanding ${rupees(newOut)}${newOut > 0 ? ` · oldest bill ${due} d` : ""}`,
+      open_orders: open,
+      reply_text: [
+        `💰 Payment ${rupees(a.amount_paise)} ${a.mode} · ${r.name} · outstanding ${rupees(newOut)}${newOut > 0 ? ` · oldest bill ${due} d` : ""}`,
+        ...(open.length
+          ? [`Open orders: ${open.map((o) => `#${o.id} ${o.status}`).join(", ")}`]
+          : []),
+      ].join("\n"),
     },
     entityId: r.id,
     before: { outstanding: r.outstanding },
