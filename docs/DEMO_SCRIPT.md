@@ -32,8 +32,11 @@ Expected:
 Draft #1046 — Sharma General Store, Karol Bagh
 • Crunchy Masala Noodles 70g — 10 cs ✅ (scheme 10+1 → +1 free)
 • Gold Glucose Biscuits — 5 cs ⚠️ sirf 3 in stock (2 din ka cover)
-⚠️ Credit: ₹52,300 exposure vs ₹40,000 limit · oldest due 12 d · last paid ₹8,000 (9 d ago)
-Approval: amit_manager. Sent to office room.
+Estimate ₹16,770 incl. GST
+⚠️ Credit: ₹55,270 exposure vs ₹40,000 limit
+Outstanding ₹38,500 · limit ₹40,000 · is order ke baad ₹55,270 (₹15,270 upar)
+Oldest bill 12 d (credit 21 d) · last paid ₹8,000 cash (9 d ago) · avg ₹20,864/month
+Approval chahiye: amit_manager, owner
 ```
 VO: *"Hinglish in. Party resolved, stock checked, credit checked, scheme applied, manager tagged — in eight seconds."* (Point at Switch's elapsed-time status.)
 
@@ -50,7 +53,7 @@ Show the approval card the agent posted in the office room (or `@desk pending` i
 ```
 @desk approve 1046, biscuit 3 hi bhejo
 ```
-Expected: `Confirmed ✅ #1046 … 2 cs backorder · Total ₹18,644 incl. GST · INV-2026-0012` + the PDF lands + pick list to `suresh_wh`.
+Expected: `Confirmed ✅ #1046 … 2 cs backorder · Total ₹14,363 incl. GST · INV-2026-0012` + the PDF lands + pick list to `suresh_wh`.
 VO: *"The manager sees what a manager actually weighs — outstanding, oldest dues, last payment — approves, trims the quantity. Bill and pick list are already out."*
 
 ### 6. Godown + collection (1:45–2:05)
