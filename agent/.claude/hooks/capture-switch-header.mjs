@@ -1,14 +1,20 @@
 #!/usr/bin/env node
 // UserPromptSubmit: remember who sent this turn's message(s), as Switch printed it.
 // Never blocks the prompt: an unparsable header just means write tools will refuse later.
-import { parseHeaders, readStdin, saveCtx } from "./switch-header.mjs";
+import { hookLog, parseHeaders, readStdin, saveCtx } from "./switch-header.mjs";
 
+const t0 = Date.now();
 try {
   const input = await readStdin();
   const headers = parseHeaders(input.prompt);
   if (headers.length > 0) saveCtx(input.session_id, headers);
-  process.stderr.write(`[orderroom] captured ${headers.length} Switch header(s)\n`);
+  hookLog({
+    hook: "capture",
+    session: input.session_id,
+    senders: headers.map((h) => h.handle),
+    ms: Date.now() - t0,
+  });
 } catch (e) {
-  process.stderr.write(`[orderroom] capture failed: ${e}\n`);
+  hookLog({ hook: "capture", error: String(e), ms: Date.now() - t0 });
 }
 process.exit(0);

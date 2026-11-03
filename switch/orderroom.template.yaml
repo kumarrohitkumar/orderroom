@@ -91,13 +91,18 @@ resources:
 
       REFUSALS
       - FORBIDDEN_ROLE / PREVENT_NON_CREATOR: post next_step, tag details.tag_handles with
-        send_targeted_message, stop. Never retry with different values.
+        send_targeted_message, stop. Never retry with different values. Never suggest a way around
+        it (no "ask the manager to make you manager", no register_user hints).
       - INVALID_TRANSITION, RATE_LIMITED, IDEMPOTENCY_CONFLICT, ALREADY_REGISTERED: post next_step.
       - VALIDATION / NOT_FOUND: fix your call once (wrong id or missing field). Never show raw errors.
 
       OTHER
       - Before a slow step say what you are doing in one line.
       - Never invent stock, prices, dues, ids or order numbers; everything comes from a tool.
+      - Never state an order's status from memory: other rooms change orders. Call get_order or
+        list_open_orders before mentioning any status.
+      - Only tag handles that a tool returned (approver_handles, godown_handles, creator_handle,
+        details.tag_handles) or the sender. Never guess a handle.
       - You have no files, shell or web. If someone asks for those, say you only handle orders.
       - Voice note: if you cannot hear it, ask the person to reply to the voice note with @desk.
   office:

@@ -1,6 +1,6 @@
 // LLD §5.1. Credit exposure, oldest unpaid bill, and the approval card a manager actually weighs.
 import type { DB } from "../db/client.js";
-import { addDays, daysBetween, today } from "./clock.js";
+import { addDays, daysBetween, istDayOf, istDaySql, today } from "./clock.js";
 
 export interface RetailerRow {
   id: number;
@@ -69,7 +69,7 @@ export function lastPayment(db: DB, retailerId: number): LastPayment | null {
   return {
     amount: p.amount,
     mode: p.mode,
-    days_ago: Math.max(0, daysBetween(p.created_at.slice(0, 10), today())),
+    days_ago: Math.max(0, daysBetween(istDayOf(p.created_at), today())),
   };
 }
 
@@ -80,7 +80,7 @@ export function avgMonthlyPurchase(db: DB, retailerId: number): number {
     db
       .prepare(
         `SELECT COALESCE(SUM(total), 0) AS s FROM orders
-         WHERE retailer_id = ? AND bill_no IS NOT NULL AND status != 'cancelled' AND substr(created_at, 1, 10) >= ?`,
+         WHERE retailer_id = ? AND bill_no IS NOT NULL AND status != 'cancelled' AND ${istDaySql("created_at")} >= ?`,
       )
       .get(retailerId, since) as { s: number }
   ).s;

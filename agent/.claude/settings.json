@@ -34,7 +34,7 @@
           {
             "type": "command",
             "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/capture-switch-header.mjs\"",
-            "timeout": 5
+            "timeout": 15
           }
         ]
       }
@@ -46,7 +46,7 @@
           {
             "type": "command",
             "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/stamp-actor.mjs\"",
-            "timeout": 5
+            "timeout": 15
           }
         ]
       }

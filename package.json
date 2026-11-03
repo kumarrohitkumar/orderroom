@@ -21,7 +21,8 @@
     "bind": "tsx scripts/bind.ts",
     "mcp": "node dist/mcp/server.js",
     "template": "tsx scripts/build-template.ts",
-    "clean-room": "bash scripts/clean-room.sh"
+    "clean-room": "bash scripts/clean-room.sh",
+    "simulate": "tsx scripts/simulate.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.6.4",

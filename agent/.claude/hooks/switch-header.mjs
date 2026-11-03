@@ -1,7 +1,7 @@
 // Shared by both hooks and the tests. Parses the identity header Switch puts *outside* the
 // nonce-delimited message body. Lines inside a body are ignored, so a pasted fake header is harmless.
 import { createHmac } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -74,4 +74,17 @@ export async function readStdin() {
   let s = "";
   for await (const chunk of process.stdin) s += chunk;
   return s ? JSON.parse(s) : {};
+}
+
+/** One line per hook run (no message text, no secrets) for `npm run doctor` and debugging. */
+export function hookLog(entry) {
+  try {
+    mkdirSync(CTX_DIR, { recursive: true });
+    appendFileSync(
+      join(CTX_DIR, "hooks.log"),
+      `${JSON.stringify({ t: new Date().toISOString(), ...entry })}\n`,
+    );
+  } catch {
+    // logging must never break a hook
+  }
 }

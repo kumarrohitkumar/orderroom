@@ -2,7 +2,7 @@
 import type { DB } from "../db/client.js";
 import { requireRole } from "./audit.js";
 import { READ_ROLES } from "./authz.js";
-import { addDays, daysBetween, today } from "./clock.js";
+import { addDays, daysBetween, istDayOf, istDaySql, today } from "./clock.js";
 import {
   avgMonthlyPurchase,
   creditView,
@@ -140,7 +140,7 @@ export function usualOrder(db: DB, retailerId: number) {
       "SELECT i.product_id, p.name, COALESCE(i.qty_confirmed, i.qty_requested) AS qty FROM order_items i JOIN products p ON p.id = i.product_id WHERE i.order_id = ? AND COALESCE(i.qty_confirmed, i.qty_requested) > 0",
     )
     .all(last.id) as { product_id: number; name: string; qty: number }[];
-  const ago = daysBetween(last.created_at.slice(0, 10), today());
+  const ago = daysBetween(istDayOf(last.created_at), today());
   return {
     party: { id: r.id, name: r.name },
     last_order_id: last.id,
@@ -187,7 +187,7 @@ export function listOpenOrders(
   const orders = rows.map((o) => ({
     ...o,
     total_text: rupees(o.total),
-    age_days: daysBetween(o.created_at.slice(0, 10), today()),
+    age_days: daysBetween(istDayOf(o.created_at), today()),
   }));
   const pending = orders.filter((o) => o.status === "needs_approval").length;
   const fmt = a.response_format ?? "concise";
@@ -227,7 +227,7 @@ export function dailySummary(
   const day = a.date ?? today();
   const billed = db
     .prepare(
-      "SELECT id, retailer_id, total FROM orders WHERE bill_no IS NOT NULL AND status != 'cancelled' AND substr(confirmed_at, 1, 10) = ?",
+      `SELECT id, retailer_id, total FROM orders WHERE bill_no IS NOT NULL AND status != 'cancelled' AND ${istDaySql("confirmed_at")} = ?`,
     )
     .all(day) as { id: number; retailer_id: number; total: number }[];
   const ids = billed.map((b) => b.id);
@@ -241,13 +241,13 @@ export function dailySummary(
   const calls = (
     db
       .prepare(
-        "SELECT COUNT(DISTINCT retailer_id) AS n FROM orders WHERE substr(created_at, 1, 10) = ? AND status != 'cancelled'",
+        `SELECT COUNT(DISTINCT retailer_id) AS n FROM orders WHERE ${istDaySql("created_at")} = ? AND status != 'cancelled'`,
       )
       .get(day) as { n: number }
   ).n;
   const pays = db
     .prepare(
-      "SELECT mode, SUM(amount) AS s FROM payments WHERE substr(created_at, 1, 10) = ? GROUP BY mode",
+      `SELECT mode, SUM(amount) AS s FROM payments WHERE ${istDaySql("created_at")} = ? GROUP BY mode`,
     )
     .all(day) as {
     mode: string;

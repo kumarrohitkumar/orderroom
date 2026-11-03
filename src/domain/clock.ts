@@ -37,3 +37,11 @@ export function daysBetween(from: string, to: string): number {
 export function sqlTimestamp(d: Date = now()): string {
   return d.toISOString().slice(0, 19).replace("T", " ");
 }
+
+/** IST calendar day of a stored UTC timestamp "YYYY-MM-DD HH:MM:SS". */
+export function istDayOf(ts: string): string {
+  return istDate(new Date(`${ts.replace(" ", "T")}Z`));
+}
+
+/** SQL expression: IST calendar day of a UTC timestamp column. */
+export const istDaySql = (col: string) => `date(${col}, '+330 minutes')`;
