@@ -216,9 +216,14 @@ export function listOpenOrders(
 
 export function dailySummary(
   db: DB,
-  a: { actor_handle: string; date?: string; response_format?: "concise" | "detailed" },
+  a: {
+    actor_handle: string;
+    stamp_sig?: string;
+    date?: string;
+    response_format?: "concise" | "detailed";
+  },
 ) {
-  requireRole(db, a.actor_handle, READ_ROLES.daily_summary, "see the daily summary");
+  requireRole(db, a, READ_ROLES.daily_summary, "see the daily summary");
   const day = a.date ?? today();
   const billed = db
     .prepare(

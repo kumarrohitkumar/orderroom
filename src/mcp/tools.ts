@@ -25,6 +25,11 @@ const stamp = {
     .max(200)
     .describe("message_id from the [Switch] header (idempotency key)."),
   room_id: z.string().min(1).max(200).describe("room id from the [Switch] header."),
+  stamp_sig: z
+    .string()
+    .max(128)
+    .optional()
+    .describe("Added by the OrderRoom hook. Never set it yourself."),
 };
 const id = z.number().int().positive();
 const items = z
@@ -213,6 +218,7 @@ export function registerTools(server: McpServer): void {
         "The manager's end-of-day DSR: bills cut, order value, productive calls, lines per bill, fill rate, collections by mode, pending approvals, overdue parties, low stock and over-limit parties. Managers only; anyone else gets FORBIDDEN_ROLE. date is YYYY-MM-DD in India and defaults to today. Post reply_text as is.",
       inputSchema: z.object({
         actor_handle: stamp.actor_handle,
+        stamp_sig: stamp.stamp_sig,
         date: z
           .string()
           .regex(/^\d{4}-\d{2}-\d{2}$/)

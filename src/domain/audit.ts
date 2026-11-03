@@ -6,6 +6,7 @@ import { now, sqlTimestamp } from "./clock.js";
 import { DomainError, type Envelope, TOOL_ERROR_CODES } from "./errors.js";
 import { type Actor, forbidden, resolveActor } from "./identity.js";
 import { log } from "./log.js";
+import { verifyStamp } from "./stamp.js";
 
 export const RATE_LIMIT_PER_MIN = 20;
 
@@ -13,6 +14,7 @@ export interface Stamp {
   actor_handle: string;
   message_id: string;
   room_id: string;
+  stamp_sig?: string;
 }
 
 export interface WriteCtx {
@@ -41,7 +43,7 @@ function canonical(v: unknown): unknown {
 
 /** sha256 over the canonical args, minus the delivery envelope (message/room ids). */
 export function requestHash(args: object): string {
-  const { message_id: _m, room_id: _r, ...rest } = args as Record<string, unknown>;
+  const { message_id: _m, room_id: _r, stamp_sig: _s, ...rest } = args as Record<string, unknown>;
   return createHash("sha256")
     .update(JSON.stringify(canonical(rest)))
     .digest("hex");
@@ -77,7 +79,7 @@ function insertAudit(db: DB, r: AuditRow): void {
     r.stamp.room_id,
     r.stamp.message_id,
     r.hash,
-    JSON.stringify(r.args),
+    JSON.stringify({ ...(r.args as Record<string, unknown>), stamp_sig: undefined }),
     r.outcome,
     r.errorCode ?? null,
     r.before === undefined ? null : JSON.stringify(r.before),
@@ -131,6 +133,7 @@ export function runWrite<T, A extends Stamp>(
   let entityId = spec.entityId ?? null;
 
   try {
+    verifyStamp(args);
     actor = resolveActor(db, stamp.actor_handle);
     const allowed = WRITE_ROLES[spec.action] as readonly Actor["role"][];
     if (!allowed.includes(actor.role)) throw forbidden(db, actor, spec.action, [...allowed]);
@@ -208,11 +211,12 @@ export function runWrite<T, A extends Stamp>(
 /** Read-side role gate (daily_summary). Refusals are audited too. */
 export function requireRole(
   db: DB,
-  handle: string,
+  a: { actor_handle: string; stamp_sig?: string },
   roles: readonly Actor["role"][],
   action: string,
 ): Actor {
-  const actor = resolveActor(db, handle);
+  verifyStamp(a);
+  const actor = resolveActor(db, a.actor_handle);
   if (!roles.includes(actor.role)) throw forbidden(db, actor, action, [...roles]);
   return actor;
 }

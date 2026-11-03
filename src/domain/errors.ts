@@ -13,7 +13,8 @@ export type ErrorCode =
   | "INSUFFICIENT_STOCK"
   | "RATE_LIMITED"
   | "IDEMPOTENCY_CONFLICT"
-  | "ALREADY_REGISTERED";
+  | "ALREADY_REGISTERED"
+  | "UNSTAMPED";
 
 export const TOOL_ERROR_CODES: ReadonlySet<ErrorCode> = new Set([
   "VALIDATION",

@@ -16,7 +16,12 @@
     "lint": "biome check .",
     "format": "biome format --write .",
     "setup": "npm run build && tsx scripts/setup.ts",
-    "seed": "tsx scripts/setup.ts"
+    "seed": "tsx scripts/setup.ts",
+    "doctor": "tsx scripts/doctor.ts",
+    "bind": "tsx scripts/bind.ts",
+    "mcp": "node dist/mcp/server.js",
+    "template": "tsx scripts/build-template.ts",
+    "clean-room": "bash scripts/clean-room.sh"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.6.4",

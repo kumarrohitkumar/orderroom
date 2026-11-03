@@ -6,6 +6,8 @@ export const DEMO_NOW = "2026-11-05T05:30:00Z";
 
 export function freshDb(): DB {
   process.env.ORDERROOM_NOW = DEMO_NOW;
+  // Domain tests call tools directly (no hook); tests/hooks.test.ts covers signed stamps.
+  process.env.ORDERROOM_REQUIRE_STAMP ??= "0";
   const db = openDb(":memory:");
   seed(db);
   return db;

@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "enableAllProjectMcpServers": true,
+  "permissions": {
+    "allow": ["mcp__orderroom"],
+    "deny": [
+      "Bash",
+      "PowerShell",
+      "Edit",
+      "Write",
+      "MultiEdit",
+      "NotebookEdit",
+      "Read",
+      "Glob",
+      "Grep",
+      "WebFetch",
+      "WebSearch",
+      "Agent",
+      "Monitor",
+      "Workflow",
+      "Skill",
+      "EnterWorktree",
+      "ExitWorktree",
+      "LSP",
+      "CronCreate",
+      "SendMessage",
+      "Artifact"
+    ]
+  },
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/capture-switch-header.mjs\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "mcp__orderroom__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/stamp-actor.mjs\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -65,7 +65,7 @@ describe("MCP contract", () => {
 
   it("runs the demo through the tool surface and writes a PDF bill", async () => {
     const party = await call("find_retailer", { query: "Sharma store" });
-    const rid = (party.env.data?.matches as { id: number }[])[0]?.id;
+    const rid = (party.env.data?.matches as { id: number }[] | undefined)?.[0]?.id;
     expect(rid).toBe(1);
     const draft = await call("create_order_draft", {
       ...s("ravi_sales"),
