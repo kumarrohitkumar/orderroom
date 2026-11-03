@@ -2,7 +2,9 @@
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "enableAllProjectMcpServers": true,
   "permissions": {
-    "allow": ["mcp__orderroom"],
+    "allow": [
+      "mcp__orderroom"
+    ],
     "deny": [
       "Bash",
       "PowerShell",
@@ -24,7 +26,36 @@
       "LSP",
       "CronCreate",
       "SendMessage",
-      "Artifact"
+      "Artifact",
+      "mcp__switch__add_users_to_room",
+      "mcp__switch__archive_room",
+      "mcp__switch__assume_role",
+      "mcp__switch__attach_reference_to_room",
+      "mcp__switch__create_agent",
+      "mcp__switch__create_reference",
+      "mcp__switch__create_room",
+      "mcp__switch__create_room_from_yaml",
+      "mcp__switch__create_room_group",
+      "mcp__switch__define_role",
+      "mcp__switch__delete_role",
+      "mcp__switch__delete_room_document",
+      "mcp__switch__delete_template",
+      "mcp__switch__edit_role",
+      "mcp__switch__invite_agent_to_room",
+      "mcp__switch__link_rooms",
+      "mcp__switch__release_role",
+      "mcp__switch__remove_agent_from_room",
+      "mcp__switch__remove_agent_service",
+      "mcp__switch__request_agent_deletion",
+      "mcp__switch__run_template",
+      "mcp__switch__save_template",
+      "mcp__switch__set_agent_service",
+      "mcp__switch__unarchive_room",
+      "mcp__switch__unlink_rooms",
+      "mcp__switch__update_agent_detail",
+      "mcp__switch__update_room",
+      "mcp__switch__update_room_document",
+      "mcp__switch__update_template"
     ]
   },
   "hooks": {

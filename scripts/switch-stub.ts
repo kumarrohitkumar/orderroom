@@ -23,9 +23,9 @@ serveStdio(() => {
     "post_message",
     {
       description: "Post a message to the current room.",
-      inputSchema: z.object({ text: z.string() }),
+      inputSchema: z.object({ body: z.string() }),
     },
-    async ({ text }) => out("post", text),
+    async ({ body }) => out("post", body),
   );
   s.registerTool(
     "send_targeted_message",
