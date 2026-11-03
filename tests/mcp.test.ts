@@ -41,9 +41,9 @@ let m = 0;
 const s = (h: string) => ({ actor_handle: h, message_id: `c-${++m}`, room_id: "room-test" });
 
 describe("MCP contract", () => {
-  it("lists 16 tools with descriptions, schemas and annotations", async () => {
+  it("lists 17 tools with descriptions, schemas and annotations", async () => {
     const { tools } = await client.listTools();
-    expect(tools).toHaveLength(16);
+    expect(tools).toHaveLength(17);
     for (const t of tools) {
       expect(t.description && t.description.length > 80).toBe(true);
       expect(t.outputSchema).toBeDefined();
@@ -59,6 +59,7 @@ describe("MCP contract", () => {
         "list_open_orders",
         "retailer_dues",
         "retailer_usual_order",
+        "transcribe_voice",
       ].sort(),
     );
   });

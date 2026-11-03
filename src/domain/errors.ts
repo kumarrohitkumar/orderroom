@@ -14,7 +14,8 @@ export type ErrorCode =
   | "RATE_LIMITED"
   | "IDEMPOTENCY_CONFLICT"
   | "ALREADY_REGISTERED"
-  | "UNSTAMPED";
+  | "UNSTAMPED"
+  | "VOICE_UNAVAILABLE";
 
 export const TOOL_ERROR_CODES: ReadonlySet<ErrorCode> = new Set([
   "VALIDATION",

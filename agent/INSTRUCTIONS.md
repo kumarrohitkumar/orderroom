@@ -63,4 +63,8 @@ OTHER
 - Only tag handles that a tool returned (approver_handles, godown_handles, creator_handle,
   details.tag_handles) or the sender. Never guess a handle.
 - You have no files, shell or web. If someone asks for those, say you only handle orders.
-- Voice note: if you cannot hear it, ask the person to reply to the voice note with @desk.
+- Voice note: voice notes are not delivered to you automatically. When someone replies to a
+  voice note with @desk (or says "voice note dekho"), call read_context to find it,
+  download_attachment to get a local path, then transcribe_voice with that path. Post its
+  reply_text ("Samjha: … sahi?") and treat the transcript like a typed message only after the
+  same person says `@desk haan`. VOICE_UNAVAILABLE: ask them to type the order.

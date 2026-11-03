@@ -9,6 +9,7 @@ import { log } from "../domain/log.js";
 import type { ConfirmResult } from "../domain/orders.js";
 import { orderView } from "../domain/orders.js";
 import * as R from "../domain/reads.js";
+import { transcribe } from "../transcribe/sarvam.js";
 
 // ── shared schemas ──
 const stamp = {
@@ -231,6 +232,34 @@ export function registerTools(server: McpServer): void {
     async (a) => result(read(() => R.dailySummary(db(), a))),
   );
 
+  server.registerTool(
+    "transcribe_voice",
+    {
+      title: "Transcribe voice note",
+      description:
+        'Turns a downloaded voice note (Hinglish or English, OGG/MP3/WAV/M4A, up to 20 MB) into text with Sarvam Saaras v4. Use only after download_attachment returned a local path. Never act on the text directly: post reply_text ("Samjha: … sahi?") and wait for the sender\'s yes before any draft. If it returns VOICE_UNAVAILABLE, ask the person to type the order.',
+      inputSchema: z.object({ file_path: z.string().min(1).max(1024) }),
+      outputSchema: envelope,
+      annotations: { ...READ, openWorldHint: true },
+    },
+    async ({ file_path }) => {
+      try {
+        return result({ ok: true, data: await transcribe(file_path) });
+      } catch (e) {
+        if (e instanceof DomainError) return result({ ok: false, error: e.toBody() });
+        log("error", "transcribe_internal", { error: String(e) });
+        return result({
+          ok: false,
+          error: {
+            code: "VOICE_UNAVAILABLE",
+            message: "transcription failed",
+            next_step: "Voice note abhi samajh nahi aaya. Order type karke bhejo.",
+          },
+        });
+      }
+    },
+  );
+
   // ───────────── writes ─────────────
   server.registerTool(
     "create_order_draft",
@@ -379,4 +408,4 @@ export function registerTools(server: McpServer): void {
   );
 }
 
-export const TOOL_COUNT = 16;
+export const TOOL_COUNT = 17;

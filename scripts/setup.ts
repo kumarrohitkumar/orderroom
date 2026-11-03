@@ -2,7 +2,7 @@
 // Idempotent: reseeds from scratch unless --keep.
 import { spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { dataDir, dbPath, openDb, REPO_ROOT } from "../src/db/client.js";
 import { ensureSchema } from "../src/db/migrate.js";
@@ -19,19 +19,36 @@ if (!existsSync(server)) {
 
 // 1. MCP config for the agent's Claude Code session (absolute paths: Switch launches it from agent/).
 const keyFile = join(agentDir, ".switch-ctx", "stamp.key");
+// Optional secrets from .env (never committed): only SARVAM_API_KEY is passed to the server.
+const envFile = join(REPO_ROOT, ".env");
+const dotenv: Record<string, string> = {};
+if (existsSync(envFile)) {
+  for (const line of readFileSync(envFile, "utf8").split("\n")) {
+    const m = /^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*?)\s*$/.exec(line);
+    if (m?.[1] && m[2]) dotenv[m[1]] = m[2].replace(/^["']|["']$/g, "");
+  }
+}
+const sarvam = process.env.SARVAM_API_KEY ?? dotenv.SARVAM_API_KEY;
 const mcp = {
   mcpServers: {
     orderroom: {
       type: "stdio",
       command: process.execPath,
       args: [server],
-      env: { ORDERROOM_DATA_DIR: data, ORDERROOM_STAMP_KEY_FILE: keyFile, ORDERROOM_LOG: "info" },
+      env: {
+        ORDERROOM_DATA_DIR: data,
+        ORDERROOM_STAMP_KEY_FILE: keyFile,
+        ORDERROOM_LOG: "info",
+        ...(sarvam ? { SARVAM_API_KEY: sarvam } : {}),
+      },
       alwaysLoad: true,
     },
   },
 };
 writeFileSync(join(agentDir, ".mcp.json"), `${JSON.stringify(mcp, null, 2)}\n`);
-console.log(`[setup] wrote agent/.mcp.json → ${server}`);
+console.log(
+  `[setup] wrote agent/.mcp.json → ${server}${sarvam ? " (voice notes on)" : " (voice notes off: no SARVAM_API_KEY)"}`,
+);
 
 // 2. Stamp key shared by the hook and the MCP server (never committed; the agent cannot read files).
 mkdirSync(join(agentDir, ".switch-ctx"), { recursive: true });
