@@ -1,0 +1,8 @@
+node_modules/
+dist/
+data/
+agent/.switch-ctx/
+.env
+*.log
+.DS_Store
+coverage/

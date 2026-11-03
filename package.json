@@ -1,0 +1,29 @@
+{
+  "name": "orderroom",
+  "version": "0.1.0",
+  "description": "An FMCG distributor's order desk: salesmen on Telegram, office on Mattermost, one AI agent placed by Switch, rules enforced in code.",
+  "license": "MIT",
+  "author": "Rohit Kumar",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "lint": "biome check .",
+    "format": "biome format --write ."
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.6.4",
+    "@types/node": "^26.6.6",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "vitest": "^5.1.0"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
+  }
+}
