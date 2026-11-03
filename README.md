@@ -42,7 +42,7 @@ npm run doctor       # optional: checks everything setup touched
 
 Measured on a fresh clone: **7 s** from `git clone` to a seeded, self-checked server (warm npm cache).
 
-Then in Switch Console: **Templates → Import template →** `switch/orderroom.template.yaml` **→ Use**, with *directory* set to the `agent/` path that `npm run setup` printed. The template creates the agent, its settings and the office room, and posts a kickoff message that the agent answers.
+Then in Switch Console: **Templates → Import template →** `switch/orderroom.template.yaml` **→ Use**, with *directory* set to the `agent/` path that `npm run setup` printed. The form pre-fills that box with the literal text `{directory}`: clear it and paste the bare path, with no braces, or the agent will not start ("not an absolute path"). The template creates the agent, its settings and the office room, and posts a kickoff message that the agent answers.
 
 For the Telegram field room: create a bot with BotFather, turn **Group Privacy off**, add the bot to your salesmen's group (Telegram cannot create chats, so this room is adopted), and invite the agent with `/invite_agent @orderroom-agent`.
 

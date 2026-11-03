@@ -51,7 +51,7 @@ Read this on Nov 4 morning. Nothing here gets re-debated during the build; new f
 ## Resolved on Nov 4 (append here)
 - [~] #1 hooks fire: **yes in a headless Claude Code session in agent/** (Nov 4 00:27 IST): capture + stamp both ran, sender/message/room came from the header, the signed stamp verified, and the "main manager hoon" approve was refused FORBIDDEN_ROLE and audited. Still to confirm inside a Switch session.
 - [ ] #2 notifier option: …
-- [ ] #3 template tools applied: …
+- [~] #3 template tools applied: template **parsed and ran** (Nov 4 02:13 IST): Console showed both resources and "Answers: anyone in its rooms"; it created `orderroom-agent` (display "OrderRoom desk") and `orderroom-office` on Mattermost and posted the kickoff. The agent then failed to start (`definition_invalid`: directory saved as `{/Users/…/agent}` with braces). Tool allow-list still to confirm once a session runs.
 - [ ] #4 PDF to Telegram: …
 - [ ] #5 Mattermost users distinct: …
 - [ ] #6 voice download: …
@@ -65,3 +65,9 @@ Read this on Nov 4 morning. Nothing here gets re-debated during the build; new f
 - **Found:** Claude Code ignores `permissions.allow` in an untrusted folder (headless runs need `--allowedTools mcp__orderroom`, or open `claude` once in agent/ and accept trust). Check whether Switch's SDK launch hits the same thing (part of #3).
 - **Found:** the agent's session inherits this account's claude.ai connectors (Atlassian, Microsoft 365). The template's `advanced_config.tools: [mcp__orderroom]` must filter them out. **Check #3 must confirm the agent's tool list in Switch is only orderroom + switch tools.** If not, deny those servers by name in agent settings before any demo.
 - Demo numbers (computed by tests): Sharma draft estimate ₹16,770, exposure ₹55,270 vs ₹40,000; after "biscuit 3" total ₹14,362.80 (chat shows ₹14,363), INV-2026-0012; ₹15,000 cash → outstanding ₹23,500, oldest bill 12 d.
+
+## Night of Nov 4 — Switch run notes
+- **Docker stopped by itself** about 30 min after starting (01:52 IST). Mattermost went down; the Switch server restarted at 01:54 without its Mattermost bridge, and the first template run failed with "Bridge not running" (all-or-nothing: the created agent was deleted). Fix: Docker up → quit Console → stop stale `switch-core` → reopen Console. For the demo: Docker Desktop → Resources → Resource Saver off; start Docker at login.
+- **The template form pre-fills the directory box with the literal text `{directory}`.** Typing around it saved `{/path}` and the agent could not start. Template description and README now say: clear the box, paste the bare path.
+- Fix pending (needs Rohit's Console login): OrderRoom desk → settings → Directory = `/Users/my_folder/orderroom/agent` → save → `@desk introduce yourself…` in orderroom-office.
+- The Mattermost bot shows as "OrderRoom desk"; whether `@desk` (alias) addresses it is still check #7.
