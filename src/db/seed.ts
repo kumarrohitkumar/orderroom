@@ -299,7 +299,7 @@ export const SEED_ORDERS: SeedOrder[] = [
     status: "delivered",
     deliveredDaysAgo: 12,
     items: [
-      ["NDL-070", 8],
+      ["NDL-070", 12],
       ["DET-BW1K", 4],
       ["NMK-ALU40", 3],
     ],
@@ -308,9 +308,9 @@ export const SEED_ORDERS: SeedOrder[] = [
     id: 1039,
     retailer: 2,
     by: "ravi_sales",
-    daysAgo: 21,
+    daysAgo: 15,
     status: "delivered",
-    deliveredDaysAgo: 20,
+    deliveredDaysAgo: 14,
     items: [
       ["TEA-AG250", 4],
       ["NDL-070", 10],
@@ -465,9 +465,9 @@ export function seed(db: DB): Record<string, number> {
 
     const insO = db.prepare(`INSERT INTO orders
       (id, retailer_id, status, created_by, approved_by, decision_note, subtotal, tax, total, bill_no,
-       delivered_at, due_date, room_id, source_message_id, created_at, updated_at)
+       confirmed_at, delivered_at, due_date, room_id, source_message_id, created_at, updated_at)
       VALUES (@id, @retailer_id, @status, @created_by, @approved_by, @decision_note, @subtotal, @tax, @total, @bill_no,
-       @delivered_at, @due_date, 'seed', @msg, @created_at, @updated_at)`);
+       @confirmed_at, @delivered_at, @due_date, 'seed', @msg, @created_at, @updated_at)`);
     const insI = db.prepare(`INSERT INTO order_items
       (order_id, product_id, qty_requested, qty_confirmed, qty_free, unit_price) VALUES (?, ?, ?, ?, ?, ?)`);
     const reserve = db.prepare("UPDATE stock SET reserved = reserved + ? WHERE product_id = ?");
@@ -498,6 +498,7 @@ export function seed(db: DB): Record<string, number> {
         tax: totals.tax,
         total: totals.total,
         bill_no: billed ? `INV-2026-${String(billNo++).padStart(4, "0")}` : null,
+        confirmed_at: billed ? stamp(o.daysAgo, 12) : null,
         delivered_at: delivered,
         due_date: delivered ? addDays(delivered, retailer?.days ?? 21) : null,
         msg: `seed-${o.id}`,

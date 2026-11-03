@@ -1,5 +1,6 @@
 // Authoritative schema (LLD §3). Kept as a TS string so `tsc` ships it in dist/ with no copy step.
-// Change from LLD v2: orders.delivered_at, so "oldest due days" is the age of the oldest unpaid bill.
+// Changes from LLD v2: orders.delivered_at ("oldest due days" = age of the oldest unpaid bill)
+// and orders.confirmed_at (DSR counts bills cut per day).
 
 export const SCHEMA_VERSION = 1;
 
@@ -67,6 +68,7 @@ CREATE TABLE orders (
   total             INTEGER NOT NULL DEFAULT 0,
   bill_no           TEXT UNIQUE,
   bill_path         TEXT,
+  confirmed_at      TEXT,
   delivered_at      TEXT,
   due_date          TEXT,
   room_id           TEXT NOT NULL,
