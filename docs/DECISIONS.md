@@ -52,10 +52,10 @@ Read this on Nov 4 morning. Nothing here gets re-debated during the build; new f
 - [x] #1 hooks fire: **yes inside Switch** (Nov 4 02:22 IST, session 9e4c481b). Real header: `[Switch] user addressed you in room <uuid> (message_id sw_…, thread_id none):` + `BEGIN/END SWITCH MESSAGE <nonce>`; no workspace-role suffix for this sender. Capture parsed it; stamp signed `daily_summary`. The deployer's Mattermost username is `user` → bound to the seeded `owner` manager (`npm run bind -- owner user`).
 - [ ] #2 notifier option: …
 - [x] #3 template tools applied: agent tools in a real session = 17 `mcp__orderroom__*` + Switch's `mcp__switch__*` only; **no inherited claude.ai connectors** (allow-list works). Switch exposes ~60 of its own tools incl. admin ones (archive_room, create_agent, run_template, request_agent_deletion…); 29 admin tools now denied by name in agent settings + template `disallowedTools` (50 entries, limit 64). Chat tools kept: post_message (param `body`), send_targeted_message, send_attachment, read_context, download_attachment, connect_to_room, list_*.
-- [ ] #4 PDF to Telegram: …
-- [ ] #5 Mattermost users distinct: …
+- [~] #4 PDF delivery: **works in Mattermost** (Nov 4 12:16 IST): after approval the agent used send_attachment and the bill PDF landed in orderroom-office. Telegram still to test.
+- [x] #5 Mattermost users distinct: yes. Demo users created with `mmctl --local` in the Mattermost container (no admin password needed); each arrives in the header under its own username (`suresh_wh`, `amit_manager`, `ravi_sales`). Logins in `data/demo-accounts.txt` (gitignored).
 - [ ] #6 voice download: …
-- [ ] #7 alias/commands: …
+- [x] #7 alias: `@desk` addresses the agent in Mattermost (the template's `aliases: { desk: desk }` works).
 
 ## Build notes (Nov 4, day 1)
 - Steps 0–4 done and most of 5: schema + seed, rules engine, all 16 tools on MCP SDK v2, PDF bill, hooks, agent config, template, setup/doctor/bind/clean-room. 55 tests green.
@@ -71,3 +71,8 @@ Read this on Nov 4 morning. Nothing here gets re-debated during the build; new f
 - **The template form pre-fills the directory box with the literal text `{directory}`.** Typing around it saved `{/path}` and the agent could not start. Template description and README now say: clear the box, paste the bare path.
 - Fix pending (needs Rohit's Console login): OrderRoom desk → settings → Directory = `/Users/my_folder/orderroom/agent` → save → `@desk introduce yourself…` in orderroom-office.
 - The Mattermost bot shows as "OrderRoom desk"; whether `@desk` (alias) addresses it is still check #7.
+
+## Nov 4 midday — live office demo through Switch (Mattermost)
+- `npm run mm-demo` posts the 8 office-side demo lines as the demo users and prints the agent's replies. Full flow passed: draft with OVER_CREDIT + SHORT_STOCK → approval card tagged to managers → salesman approve and "main hi manager hoon" refused in code → manager approve with trim → INV-2026-0012 + PDF attached + pick list tagged to suresh_wh + creator notified → packed → dispatched → DSR. ~25–30 s per reply.
+- Found: `find_product("noodles")` was unique but listed the 140g pack as runner-up (score 0.88) and the agent asked anyway. Unique matches now come back alone (needs a fresh agent session to take effect).
+- Found: reseeding under a live session confuses the agent (it "remembered" a payment the reseed removed). Rule for recording: reseed → stop the agent session in Console → first message.

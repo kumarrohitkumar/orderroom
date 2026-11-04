@@ -44,3 +44,11 @@ describe("matching", () => {
     expect(findRetailer(db, "xyzzy qwerty").status).toBe("none");
   });
 });
+
+describe("unique matches come back alone", () => {
+  it("noodles → only the 70g pack, no runner-up to tempt a question", () => {
+    const r = findProduct(db, "noodles");
+    expect(r.status).toBe("unique");
+    expect(r.matches).toHaveLength(1);
+  });
+});

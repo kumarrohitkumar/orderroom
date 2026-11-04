@@ -23,7 +23,10 @@
     "template": "tsx scripts/build-template.ts",
     "clean-room": "bash scripts/clean-room.sh",
     "simulate": "npm run build && tsx scripts/simulate.ts",
-    "add-user": "tsx scripts/add-user.ts"
+    "add-user": "tsx scripts/add-user.ts",
+    "mm-say": "tsx scripts/mm-say.ts",
+    "mm-read": "tsx scripts/mm-read.ts",
+    "mm-demo": "tsx scripts/mm-demo.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.6.4",

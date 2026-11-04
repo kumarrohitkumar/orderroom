@@ -104,9 +104,11 @@ export function rank<T>(query: string, cands: Candidate<T>[], limit = 3): MatchR
   const unique = (best === 1 && exactCount === 1) || (best >= 0.85 && second < 0.6);
   const conf = (s: number, i: number): Confidence =>
     i === 0 && unique ? "high" : s >= 0.6 ? "medium" : "low";
+  // A unique match is returned alone: showing runners-up made the agent ask needless questions.
+  const shown = unique ? top.slice(0, 1) : top;
   return {
     status: top.length === 0 ? "none" : unique ? "unique" : "ambiguous",
-    matches: top.map((m, i) => ({
+    matches: shown.map((m, i) => ({
       ...m,
       score: Math.round(m.score * 100) / 100,
       confidence: conf(m.score, i),
