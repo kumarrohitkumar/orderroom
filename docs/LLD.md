@@ -300,7 +300,7 @@ Text block per confirmed order: party, area, lines with cases and units, scheme 
 - 10 historical orders spread over statuses and 5–50 days back (aging), 6 payments (cash/UPI/cheque; UPI majority).
 - `counters.bill = 11` → first demo bill `INV-2026-0012`. Order ids from 1041.
 
-`npm run setup` is idempotent (drops and recreates unless `--keep`).
+`npm run setup` is idempotent (keeps data; `--reset` drops and reseeds).
 
 ## 12. Agent layer
 

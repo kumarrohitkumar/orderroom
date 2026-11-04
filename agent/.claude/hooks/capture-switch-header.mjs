@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 // UserPromptSubmit: remember who sent this turn's message(s), as Switch printed it.
-// Never blocks the prompt: an unparsable header just means write tools will refuse later.
+// Always overwrites the context, so a turn with no parsable header can never reuse the previous
+// sender. Never blocks the prompt: no sender just means OrderRoom tools refuse this turn.
 import { hookLog, parseHeaders, readStdin, saveCtx } from "./switch-header.mjs";
 
 const t0 = Date.now();
 try {
   const input = await readStdin();
   const headers = parseHeaders(input.prompt);
-  if (headers.length > 0) saveCtx(input.session_id, headers);
+  saveCtx(input.session_id, headers);
   hookLog({
     hook: "capture",
     session: input.session_id,

@@ -1,8 +1,9 @@
-// The 16 OrderRoom tools (LLD §10). Thin adapters: zod in, domain call, envelope out.
+// The 18 OrderRoom tools (LLD §10). Thin adapters: zod in, domain call, envelope out.
 import type { McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod";
 import { getDb } from "../db/client.js";
 import { writes } from "../domain/api.js";
+import { ALL_ROLES, requireRole } from "../domain/audit.js";
 import { writeBillPdf } from "../domain/billPdf.js";
 import { DomainError, type Envelope, isToolError } from "../domain/errors.js";
 import { log } from "../domain/log.js";
@@ -32,6 +33,8 @@ const stamp = {
     .optional()
     .describe("Added by the OrderRoom hook. Never set it yourself."),
 };
+// Reads carry the same stamp (message_id optional) so only registered staff can read the books.
+const who = { ...stamp, message_id: stamp.message_id.optional() };
 const id = z.number().int().positive();
 const items = z
   .array(
@@ -79,8 +82,11 @@ function result(env: Env) {
   };
 }
 
-function read<T>(fn: () => T): Env {
+type Who = { actor_handle: string; message_id?: string; room_id?: string; stamp_sig?: string };
+
+function read<T>(fn: () => T, gate?: { a: Who; tool: string }): Env {
   try {
+    if (gate) requireRole(getDb(), gate.a, ALL_ROLES, gate.tool);
     return { ok: true, data: fn() };
   } catch (e) {
     if (e instanceof DomainError) {
@@ -124,11 +130,11 @@ export function registerTools(server: McpServer): void {
       title: "Find party",
       description:
         "Fuzzy-search parties (retailers) by the name the salesman typed, e.g. 'Sharma store' or 'gupta wale'. Use it before any order, payment or dues question to get the retailer_id. status 'unique' means use the first match; 'ambiguous' means ask one short question listing the options (name + area); 'none' means ask for the shop name and area. Never guess an id.",
-      inputSchema: z.object({ query: z.string().min(1).max(100) }),
+      inputSchema: z.object({ ...who, query: z.string().min(1).max(100) }),
       outputSchema: envelope,
       annotations: READ,
     },
-    async ({ query }) => result(read(() => R.findRetailer(db(), query))),
+    async (a) => result(read(() => R.findRetailer(db(), a.query), { a, tool: "find_retailer" })),
   );
 
   server.registerTool(
@@ -137,11 +143,11 @@ export function registerTools(server: McpServer): void {
       title: "Find product",
       description:
         "Fuzzy-search products by Hinglish names like 'noodles', 'glucose biscuit', 'chai', 'surf'. Returns product_id, case price, available cases, days of cover and any scheme. Call once per item before create_order_draft; the units in chat (peti, case, carton, box) are all cases. If status is 'ambiguous', ask which one in a single question.",
-      inputSchema: z.object({ query: z.string().min(1).max(100) }),
+      inputSchema: z.object({ ...who, query: z.string().min(1).max(100) }),
       outputSchema: envelope,
       annotations: READ,
     },
-    async ({ query }) => result(read(() => R.findProduct(db(), query))),
+    async (a) => result(read(() => R.findProduct(db(), a.query), { a, tool: "find_product" })),
   );
 
   server.registerTool(
@@ -150,11 +156,12 @@ export function registerTools(server: McpServer): void {
       title: "Party dues",
       description:
         "Credit position of one party: outstanding (udhaar), open bills not yet delivered, credit limit, headroom, oldest unpaid bill age and last payment. Use for questions like 'Sharma ka kitna baaki hai?'. Do not use it to decide approvals; create_order_draft already applies the credit rules. Post reply_text as is.",
-      inputSchema: z.object({ retailer_id: id }),
+      inputSchema: z.object({ ...who, retailer_id: id }),
       outputSchema: envelope,
       annotations: READ,
     },
-    async ({ retailer_id }) => result(read(() => R.retailerDues(db(), retailer_id))),
+    async (a) =>
+      result(read(() => R.retailerDues(db(), a.retailer_id), { a, tool: "retailer_dues" })),
   );
 
   server.registerTool(
@@ -163,11 +170,12 @@ export function registerTools(server: McpServer): void {
       title: "Usual order",
       description:
         "The party's last billed order lines, for 'Gupta ka usual' or 'wahi pichle wala'. Returns product_ids and quantities you can pass straight to create_order_draft after the sender says yes. It does not create anything. If lines is empty, say there is no previous order.",
-      inputSchema: z.object({ retailer_id: id }),
+      inputSchema: z.object({ ...who, retailer_id: id }),
       outputSchema: envelope,
       annotations: READ,
     },
-    async ({ retailer_id }) => result(read(() => R.usualOrder(db(), retailer_id))),
+    async (a) =>
+      result(read(() => R.usualOrder(db(), a.retailer_id), { a, tool: "retailer_usual_order" })),
   );
 
   server.registerTool(
@@ -176,11 +184,11 @@ export function registerTools(server: McpServer): void {
       title: "Get order",
       description:
         "Full view of one order by number (#1046): status, lines, totals, approval reasons, the approval card when it needs approval, bill number and bill_path. Use for 'status of 1046' or before posting an approval card in the office room. Read-only; it never changes the order.",
-      inputSchema: z.object({ order_id: id }),
+      inputSchema: z.object({ ...who, order_id: id }),
       outputSchema: envelope,
       annotations: READ,
     },
-    async ({ order_id }) => result(read(() => orderView(db(), order_id))),
+    async (a) => result(read(() => orderView(db(), a.order_id), { a, tool: "get_order" })),
   );
 
   server.registerTool(
@@ -188,8 +196,9 @@ export function registerTools(server: McpServer): void {
     {
       title: "Open orders",
       description:
-        "Orders that are not finished (draft, needs approval, confirmed, packed, dispatched), approvals first, at most 25. Use for 'kya pending hai', 'approval list' or 'aaj kya dispatch hona hai'. Filter by status, party or room when the question is narrower. response_format 'concise' (default) keeps the output small.",
+        "Orders that are not finished (draft, needs approval, confirmed, packed, dispatched), approvals first, at most 25. Use for 'kya pending hai', 'approval list' or 'aaj kya dispatch hona hai'. Filter by status, party or from_room_id when the question is narrower. response_format 'concise' (default) keeps the output small.",
       inputSchema: z.object({
+        ...who,
         status: z
           .array(
             z.enum([
@@ -202,13 +211,13 @@ export function registerTools(server: McpServer): void {
           )
           .optional(),
         retailer_id: id.optional(),
-        room_id: z.string().max(200).optional(),
+        from_room_id: z.string().max(200).optional().describe("Only orders created in this room."),
         response_format: z.enum(["concise", "detailed"]).optional(),
       }),
       outputSchema: envelope,
       annotations: READ,
     },
-    async (a) => result(read(() => R.listOpenOrders(db(), a))),
+    async (a) => result(read(() => R.listOpenOrders(db(), a), { a, tool: "list_open_orders" })),
   );
 
   server.registerTool(
@@ -218,8 +227,7 @@ export function registerTools(server: McpServer): void {
       description:
         "The manager's end-of-day DSR: bills cut, order value, productive calls, lines per bill, fill rate, collections by mode, pending approvals, overdue parties, low stock and over-limit parties. Managers only; anyone else gets FORBIDDEN_ROLE. date is YYYY-MM-DD in India and defaults to today. Post reply_text as is.",
       inputSchema: z.object({
-        actor_handle: stamp.actor_handle,
-        stamp_sig: stamp.stamp_sig,
+        ...who,
         date: z
           .string()
           .regex(/^\d{4}-\d{2}-\d{2}$/)
@@ -238,13 +246,14 @@ export function registerTools(server: McpServer): void {
       title: "Transcribe voice note",
       description:
         'Turns a downloaded voice note (Hinglish or English, OGG/MP3/WAV/M4A, up to 20 MB) into text with Sarvam Saaras v4. Use only after download_attachment returned a local path. Never act on the text directly: post reply_text ("Samjha: … sahi?") and wait for the sender\'s yes before any draft. If it returns VOICE_UNAVAILABLE, ask the person to type the order.',
-      inputSchema: z.object({ file_path: z.string().min(1).max(1024) }),
+      inputSchema: z.object({ ...who, file_path: z.string().min(1).max(1024) }),
       outputSchema: envelope,
       annotations: { ...READ, openWorldHint: true },
     },
-    async ({ file_path }) => {
+    async (a) => {
       try {
-        return result({ ok: true, data: await transcribe(file_path) });
+        requireRole(db(), a, ALL_ROLES, "transcribe_voice");
+        return result({ ok: true, data: await transcribe(a.file_path) });
       } catch (e) {
         if (e instanceof DomainError) return result({ ok: false, error: e.toBody() });
         log("error", "transcribe_internal", { error: String(e) });
@@ -375,7 +384,7 @@ export function registerTools(server: McpServer): void {
     {
       title: "Record collection",
       description:
-        "Records money collected from a party: amount in paise (₹15,000 → 1500000) and mode cash, upi, cheque or bank. Salesmen, delivery and managers can record. Returns the new outstanding and oldest unpaid bill age. Confirm the amount back in the reply; never record a payment the sender did not state.",
+        "Records money collected from a party: amount in paise (₹15,000 → 1500000) and mode cash, upi, cheque or bank. Salesmen, delivery and managers can record. A manager's entry counts at once; anyone else's is 'pending' and does not reduce outstanding until a manager runs verify_payment. Returns the payment id (P12), status, outstanding and oldest unpaid bill age. Confirm the amount back in the reply; never record a payment the sender did not state.",
       inputSchema: z.object({
         ...stamp,
         retailer_id: id,
@@ -387,6 +396,23 @@ export function registerTools(server: McpServer): void {
       annotations: WRITE,
     },
     async (a) => result(writes.record_payment(db(), a)),
+  );
+
+  server.registerTool(
+    "verify_payment",
+    {
+      title: "Verify collection (manager)",
+      description:
+        "Manager confirms ('verify') or rejects a pending payment by id, after the cash is handed over or the UPI is seen. Only then does it reduce the party's outstanding. Managers only, from the office room. Use for '@desk P12 verify' or 'P12 reject'. Pending payments are listed in the DSR.",
+      inputSchema: z.object({
+        ...stamp,
+        payment_id: id,
+        decision: z.enum(["verify", "reject"]),
+      }),
+      outputSchema: envelope,
+      annotations: WRITE,
+    },
+    async (a) => result(writes.verify_payment(db(), a)),
   );
 
   server.registerTool(
@@ -408,4 +434,4 @@ export function registerTools(server: McpServer): void {
   );
 }
 
-export const TOOL_COUNT = 17;
+export const TOOL_COUNT = 18;

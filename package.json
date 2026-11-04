@@ -7,7 +7,7 @@
   "type": "module",
   "private": true,
   "engines": {
-    "node": ">=20"
+    "node": ">=22.12"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
@@ -19,6 +19,7 @@
     "seed": "tsx scripts/setup.ts",
     "doctor": "tsx scripts/doctor.ts",
     "bind": "tsx scripts/bind.ts",
+    "bind-room": "tsx scripts/bind-room.ts",
     "mcp": "node dist/mcp/server.js",
     "template": "tsx scripts/build-template.ts",
     "clean-room": "bash scripts/clean-room.sh",

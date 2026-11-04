@@ -62,7 +62,7 @@ export interface LastPayment {
 export function lastPayment(db: DB, retailerId: number): LastPayment | null {
   const p = db
     .prepare(
-      "SELECT amount, mode, created_at FROM payments WHERE retailer_id = ? ORDER BY created_at DESC, id DESC LIMIT 1",
+      "SELECT amount, mode, created_at FROM payments WHERE retailer_id = ? AND status = 'verified' ORDER BY created_at DESC, id DESC LIMIT 1",
     )
     .get(retailerId) as { amount: number; mode: string; created_at: string } | undefined;
   if (!p) return null;

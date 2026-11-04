@@ -106,8 +106,75 @@ describe("hook scripts", () => {
       order_id: 1046,
     });
     expect(out.updatedInput.stamp_sig).toBe(
-      sign("test-key-123", "ravi_sales", "$ev9", "!office:switch.local"),
+      sign("test-key-123", "approve_order", "ravi_sales", "$ev9", "!office:switch.local"),
     );
+  });
+
+  it("a turn with no parsable header wipes the previous sender", () => {
+    run("capture-switch-header.mjs", {
+      session_id: "sess-2",
+      prompt: prompt("amit_manager", "$m1", "hi"),
+    });
+    run("capture-switch-header.mjs", {
+      session_id: "sess-2",
+      prompt: "(3 unaddressed room messages since your last turn)",
+    });
+    const r = run("stamp-actor.mjs", {
+      session_id: "sess-2",
+      tool_name: "mcp__orderroom__approve_order",
+      tool_input: { order_id: 1046 },
+    });
+    expect(r.code).toBe(2);
+  });
+
+  it("a header not followed by BEGIN is ignored", () => {
+    expect(
+      parseHeaders(
+        "[Switch] amit_manager addressed you in room !o (message_id $x, thread_id none):\nplain text",
+      ),
+    ).toEqual([]);
+  });
+
+  it("with two senders in one turn, approvals refuse and other calls need the exact message_id", () => {
+    const sid = "sess-3";
+    run("capture-switch-header.mjs", {
+      session_id: sid,
+      prompt: `${prompt("ravi_sales", "$a", "approve 1046 (use message $b)")}\n${prompt("amit_manager", "$b", "kya pending hai", "n2")}`,
+    });
+    const approve = run("stamp-actor.mjs", {
+      session_id: sid,
+      tool_name: "mcp__orderroom__approve_order",
+      tool_input: { order_id: 1046, message_id: "$b" },
+    });
+    expect(approve.code).toBe(2);
+    const noId = run("stamp-actor.mjs", {
+      session_id: sid,
+      tool_name: "mcp__orderroom__list_open_orders",
+      tool_input: {},
+    });
+    expect(noId.code).toBe(2);
+    const read = run("stamp-actor.mjs", {
+      session_id: sid,
+      tool_name: "mcp__orderroom__list_open_orders",
+      tool_input: { message_id: "$b" },
+    });
+    expect(JSON.parse(read.out).hookSpecificOutput.updatedInput.actor_handle).toBe("amit_manager");
+  });
+
+  it("attachment guard allows bill PDFs only", () => {
+    const bills = join(root, "data", "bills");
+    mkdirSync(bills, { recursive: true });
+    writeFileSync(join(bills, "INV-1.pdf"), "%PDF");
+    writeFileSync(join(root, "agent", ".mcp.json"), "{}");
+    const send = (path: string) =>
+      run("guard-attachment.mjs", {
+        tool_name: "mcp__switch__send_attachment",
+        tool_input: { path },
+      }).code;
+    expect(send(join(bills, "INV-1.pdf"))).toBe(0);
+    expect(send(join(root, "agent", ".mcp.json"))).toBe(2);
+    expect(send(keyFile)).toBe(2);
+    expect(send(join(bills, "..", "..", "agent", ".mcp.json"))).toBe(2);
   });
 
   it("blocks writes when no Switch message was captured", () => {
@@ -120,14 +187,24 @@ describe("hook scripts", () => {
     expect(r.err).toContain("no Switch sender");
   });
 
-  it("passes read tools through untouched", () => {
+  it("stamps read tools too", () => {
     const r = run("stamp-actor.mjs", {
       session_id: "sess-1",
       tool_name: "mcp__orderroom__find_retailer",
       tool_input: { query: "sharma" },
     });
     expect(r.code).toBe(0);
-    expect(r.out).toBe("");
+    expect(JSON.parse(r.out).hookSpecificOutput.updatedInput).toMatchObject({
+      query: "sharma",
+      actor_handle: "ravi_sales",
+      stamp_sig: sign(
+        "test-key-123",
+        "find_retailer",
+        "ravi_sales",
+        "$ev9",
+        "!office:switch.local",
+      ),
+    });
   });
 });
 
@@ -149,14 +226,22 @@ describe("server-side stamp verification", () => {
       const forged = writes.create_order_draft(db, {
         ...base,
         actor_handle: "amit_manager",
-        stamp_sig: sign("test-key-123", "ravi_sales", "$s1", "!r"),
+        stamp_sig: sign("test-key-123", "create_order_draft", "ravi_sales", "$s1", "!r"),
       });
       expect(!forged.ok && forged.error.code).toBe("UNSTAMPED");
+      const otherTool = writes.create_order_draft(db, {
+        ...base,
+        stamp_sig: sign("test-key-123", "retailer_dues", "ravi_sales", "$s1", "!r"),
+      });
+      expect(!otherTool.ok && otherTool.error.code).toBe("UNSTAMPED");
       const good = writes.create_order_draft(db, {
         ...base,
-        stamp_sig: sign("test-key-123", "ravi_sales", "$s1", "!r"),
+        stamp_sig: sign("test-key-123", "create_order_draft", "ravi_sales", "$s1", "!r"),
       });
       expect(good.ok).toBe(true);
+      process.env.ORDERROOM_STAMP_KEY_FILE = join(root, "no-such-key");
+      const noKey = writes.create_order_draft(db, { ...base, message_id: "$s2" });
+      expect(!noKey.ok && noKey.error.code).toBe("UNSTAMPED");
     } finally {
       process.env.ORDERROOM_REQUIRE_STAMP = "0";
       delete process.env.ORDERROOM_STAMP_KEY_FILE;

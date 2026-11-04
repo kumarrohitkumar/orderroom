@@ -10,6 +10,7 @@ export const WRITE_ROLES = {
   cancel_order: ["salesman", "manager"],
   update_status: ["godown", "delivery", "manager"],
   record_payment: ["salesman", "manager", "delivery"],
+  verify_payment: ["manager"],
   register_user: ["manager"],
 } as const satisfies Record<string, readonly Role[]>;
 

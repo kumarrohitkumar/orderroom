@@ -17,6 +17,7 @@ const STEPS: Step[] = [
   ["office", "suresh_wh", "@desk 1046 packed"],
   ["office", "suresh_wh", "@desk 1046 dispatched"],
   ["field", "ravi_sales", "@desk Sharma store se 15000 cash mila"],
+  ["office", "amit_manager", "@desk P7 verify"],
   ["field", "ravi_sales", "@desk Gupta store ka usual"],
   ["field", "ravi_sales", "@desk yes"],
   ["office", "amit_manager", "@desk aaj ka DSR"],

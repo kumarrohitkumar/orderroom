@@ -58,7 +58,9 @@ VO: *"The manager sees what a manager actually weighs — outstanding, oldest du
 
 ### 6. Godown + collection (1:45–2:05)
 Browser 2, suresh_wh: `@desk 1046 packed` → ✅; `@desk 1046 dispatched` → stock moves.
-Telegram, ravi_sales: `@desk Sharma store se 15000 cash mila` → `Payment ₹15,000 cash · outstanding ₹23,500 · oldest due 12 d`.
+Telegram, ravi_sales: `@desk Sharma store se 15000 cash mila` → `Payment P7 ₹15,000 cash · Sharma noted · manager verify karega, tab tak outstanding ₹38,500`.
+Browser 1, amit_manager: `@desk P7 verify` → `✅ Payment P7 ₹15,000 cash verified · outstanding ₹23,500`.
+VO (optional): *"A salesman saying he got the cash doesn't free credit. The manager does."*
 Optional 5 s: `@desk Gupta store ka usual` → draft from last order → `@desk yes`.
 
 ### 7. Voice ★ (2:05–2:20) — only if check #6 passed

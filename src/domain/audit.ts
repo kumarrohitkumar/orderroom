@@ -6,6 +6,7 @@ import { now, sqlTimestamp } from "./clock.js";
 import { DomainError, type Envelope, TOOL_ERROR_CODES } from "./errors.js";
 import { type Actor, forbidden, resolveActor } from "./identity.js";
 import { log } from "./log.js";
+import { checkRoom } from "./rooms.js";
 import { verifyStamp } from "./stamp.js";
 
 export const RATE_LIMIT_PER_MIN = 20;
@@ -27,6 +28,8 @@ export interface WriteSpec {
   action: WriteAction;
   entity: string;
   entityId?: string | number | null;
+  /** What one message may do once per action (defaults to entityId), e.g. one draft per party. */
+  scope?: string | number | null;
 }
 
 function canonical(v: unknown): unknown {
@@ -55,6 +58,7 @@ interface AuditRow {
   spec: WriteSpec;
   stamp: Stamp;
   hash: string;
+  scope: string;
   args: object;
   outcome: "ok" | "refused" | "error";
   errorCode?: string | null;
@@ -66,8 +70,8 @@ interface AuditRow {
 function insertAudit(db: DB, r: AuditRow): void {
   db.prepare(
     `INSERT INTO audit_log (at, actor_id, actor_handle, actor_role, action, entity, entity_id, room_id, message_id,
-       request_hash, args_json, outcome, error_code, before_json, after_json)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       request_hash, idem_scope, args_json, outcome, error_code, before_json, after_json)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     sqlTimestamp(now()),
     r.actor?.id ?? null,
@@ -79,6 +83,7 @@ function insertAudit(db: DB, r: AuditRow): void {
     r.stamp.room_id,
     r.stamp.message_id,
     r.hash,
+    r.scope,
     JSON.stringify({ ...(r.args as Record<string, unknown>), stamp_sig: undefined }),
     r.outcome,
     r.errorCode ?? null,
@@ -129,14 +134,16 @@ export function runWrite<T, A extends Stamp>(
     room_id: args.room_id,
   };
   const hash = requestHash(args);
+  const scope = String(spec.scope ?? spec.entityId ?? "");
   let actor: Actor | null = null;
   let entityId = spec.entityId ?? null;
 
   try {
-    verifyStamp(args);
+    verifyStamp(spec.action, args);
     actor = resolveActor(db, stamp.actor_handle);
     const allowed = WRITE_ROLES[spec.action] as readonly Actor["role"][];
     if (!allowed.includes(actor.role)) throw forbidden(db, actor, spec.action, [...allowed]);
+    checkRoom(db, actor, stamp.room_id);
     if (recentWrites(db, actor.handle) >= RATE_LIMIT_PER_MIN) {
       throw new DomainError(
         "RATE_LIMITED",
@@ -149,9 +156,9 @@ export function runWrite<T, A extends Stamp>(
       .transaction((): Envelope<T> => {
         const prior = db
           .prepare(
-            "SELECT request_hash, after_json FROM audit_log WHERE message_id = ? AND action = ? AND outcome = 'ok'",
+            "SELECT request_hash, after_json FROM audit_log WHERE message_id = ? AND action = ? AND idem_scope = ? AND outcome = 'ok'",
           )
-          .get(stamp.message_id, spec.action) as
+          .get(stamp.message_id, spec.action, scope) as
           | { request_hash: string; after_json: string }
           | undefined;
         if (prior) {
@@ -172,6 +179,7 @@ export function runWrite<T, A extends Stamp>(
           spec,
           stamp,
           hash,
+          scope,
           args,
           outcome: "ok",
           entityId,
@@ -199,6 +207,7 @@ export function runWrite<T, A extends Stamp>(
       spec,
       stamp,
       hash,
+      scope,
       args,
       outcome: TOOL_ERROR_CODES.has(err.code) ? "error" : "refused",
       errorCode: err.code,
@@ -208,15 +217,19 @@ export function runWrite<T, A extends Stamp>(
   }
 }
 
-/** Read-side role gate (daily_summary). Refusals are audited too. */
+export const ALL_ROLES: readonly Actor["role"][] = ["salesman", "manager", "godown", "delivery"];
+
+/** Read-side gate: a stamped, registered sender with one of `roles`, in a room that role may use. */
 export function requireRole(
   db: DB,
-  a: { actor_handle: string; stamp_sig?: string },
+  a: { actor_handle: string; message_id?: string; room_id?: string; stamp_sig?: string },
   roles: readonly Actor["role"][],
-  action: string,
+  tool: string,
+  label = tool,
 ): Actor {
-  verifyStamp(a);
+  verifyStamp(tool, a);
   const actor = resolveActor(db, a.actor_handle);
-  if (!roles.includes(actor.role)) throw forbidden(db, actor, action, [...roles]);
+  if (!roles.includes(actor.role)) throw forbidden(db, actor, label, [...roles]);
+  checkRoom(db, actor, a.room_id);
   return actor;
 }

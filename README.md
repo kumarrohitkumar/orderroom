@@ -30,13 +30,14 @@ Remove Switch and nothing works. Not because we pasted output into a chat, but b
 
 ## Run it in 10 minutes
 
-You need Node ≥ 20, Claude Code logged in, and [Switch Console](https://github.com/sandbox-quantum/switch/releases) with its local server running.
+You need Node ≥ 22.12, Claude Code logged in, and [Switch Console](https://github.com/sandbox-quantum/switch/releases) with its local server running.
 
 ```bash
 git clone https://github.com/kumarrohitkumar/orderroom.git
 cd orderroom
 npm ci
 npm run setup        # build, write agent/.mcp.json, stamp key, seed demo data, self-check
+                     # (re-running keeps your data; npm run setup -- --reset reseeds)
 npm run doctor       # optional: checks everything setup touched
 ```
 
@@ -87,10 +88,13 @@ Switch room ──message + [Switch] sender header──▶ Claude Code session 
                                        → role × action × state rules → SQLite (WAL) → audit row
 ```
 
-- **Identity.** The capture hook reads the sender only from the header Switch puts *outside* the nonce-delimited message body, so a pasted fake header inside a message is ignored. The stamp hook overwrites `actor_handle`, `message_id` and `room_id` on every write and signs them with a local key the agent cannot read (its file and shell tools are disabled). The server refuses unsigned or mis-signed writes (`UNSTAMPED`), so if a hook ever stops firing, writes fail loudly instead of trusting the model.
+- **Identity.** The capture hook reads the sender only from the header Switch puts *outside* the nonce-delimited message body (a header counts only when the next line opens that body), so a pasted fake header inside a message is ignored. It rewrites the sender file on every turn, so a turn without a header can never reuse the last person's identity. The stamp hook overwrites `actor_handle`, `message_id` and `room_id` on every OrderRoom call, reads included, and signs them together with the tool name using a local key. The agent cannot read that key: its file and shell tools are disabled, and a third hook lets `send_attachment` upload only bill PDFs, so it cannot post `.mcp.json`, the key or the database into a chat. The server refuses unsigned, mis-signed or wrong-tool calls (`UNSTAMPED`), and refuses everything if no key is installed.
+- **Rooms.** A Telegram handle is chosen by its owner, so a salesman could rename himself `@amit_manager`. Manager and godown actions therefore count only from the office room (`ROOM_NOT_ALLOWED` anywhere else). The first office-role call on a fresh install binds the office room; `npm run bind-room` lists or changes it.
+- **Money.** Cash a salesman or delivery boy says he collected is recorded as *pending* and frees no credit until a manager runs `verify_payment` (`@desk P7 verify`). Otherwise "₹10 lakh mila" would unblock any over-limit order.
+- **Batched turns.** If one turn carries messages from several people, approve, reject, cancel, payments and registration are refused ("send it again on its own"), and other calls must name the exact message they act on.
 - **Rules.** Role × action matrix; only the creator or a manager confirms a draft; credit exposure = outstanding + open bills + this order; overdue = oldest unpaid bill older than the party's credit days; short stock; scheme 10+1; partial fulfilment with backorders.
-- **Safety.** Stripe-style idempotency on `(message_id, action)` (a re-delivered message never creates a second order), 20 writes per person per minute, free text bounded and stripped of control and bidi characters, one audit row per call including refusals.
-- **Residual risks, stated plainly.** The model still chooses *which* tool to call and with what order lines. A wrong but permitted action (e.g. the wrong party) is caught by the echo and the confirmation step, not by the rules. If several people's messages arrive in one batched turn, the model picks which message a call belongs to. The hook still stamps the real sender of that message.
+- **Safety.** Stripe-style idempotency on `(message_id, action, target)` (a re-delivered message never creates a second order, while one message can still draft for two parties), 20 writes per person per minute, free text bounded and stripped of control and bidi characters, one audit row per call including refusals.
+- **Residual risks, stated plainly.** The model still chooses *which* tool to call and with what order lines. A wrong but permitted action (e.g. the wrong party) is caught by the echo and the confirmation step, not by the rules. Roles are keyed on the chat handle plus the room kind, not on Switch's participant id, so anyone who can join the *office* channel under a manager's username is trusted there; keep that channel's membership tight.
 
 Authorization matrix (enforced and tested in [tests/audit.test.ts](tests/audit.test.ts) and [tests/rules.test.ts](tests/rules.test.ts)):
 
@@ -102,8 +106,12 @@ Authorization matrix (enforced and tested in [tests/audit.test.ts](tests/audit.t
 | cancel | draft (own) | ✅ | ❌ | ❌ |
 | packed / dispatched | ❌ | ✅ | ✅ | ❌ |
 | delivered / returned | ❌ | ✅ | ✅ | ✅ |
-| record payment | ✅ | ✅ | ❌ | ✅ |
+| record payment | pending | ✅ | ❌ | pending |
+| verify payment | ❌ | ✅ | ❌ | ❌ |
 | register teammate, DSR | ❌ | ✅ | ❌ | ❌ |
+| read parties, orders, dues | ✅ | ✅ | ✅ | ✅ (registered staff only) |
+
+Manager and godown rows apply only in the office room.
 
 ## Built during the hackathon
 
@@ -111,7 +119,7 @@ Planning docs ([PLAN.md](PLAN.md), [docs/](docs/)) were written before Nov 4. Ev
 
 - **Stack:** TypeScript, `@modelcontextprotocol/server` v2, zod 4, better-sqlite3, pdfkit with Noto Sans (for ₹), vitest, biome. Claude Code is the agent runtime, placed by Switch.
 - **AI tools used:** Claude Code for building, Wispr Flow for dictation.
-- **Tests:** 56, covering the demo drafts, the approval flow, the full lifecycle, the authorization matrix, idempotency, rate limit, sanitisation, matching, India-time business days, the MCP contract over an in-memory transport, a stdio handshake, and the hook scripts (including forged headers).
+- **Tests:** 68, covering the demo drafts, the approval flow, the full lifecycle, the authorization matrix, idempotency, rate limit, sanitisation, matching, India-time business days, the MCP contract over an in-memory transport, a stdio handshake, and the hook scripts (forged headers, header-less turns, two senders in one turn, attachment paths), office-room binding and payment verification.
 
 ## Feedback for the Switch team
 

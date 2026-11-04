@@ -26,7 +26,11 @@ describe("business day is India time", () => {
         mode: "upi",
       }).ok,
     ).toBe(true);
-    const dsr = dailySummary(db, { actor_handle: "amit_manager" });
+    expect(
+      writes.verify_payment(db, { ...s("amit_manager", "d"), payment_id: 7, decision: "verify" })
+        .ok,
+    ).toBe(true);
+    const dsr = dailySummary(db, { actor_handle: "amit_manager", room_id: "r" });
     expect(dsr.date).toBe("2026-11-05");
     expect(dsr.bills_cut).toBe(1);
     expect(dsr.productive_calls).toBe(1);

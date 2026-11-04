@@ -1,13 +1,14 @@
 // Authoritative schema (LLD §3). Kept as a TS string so `tsc` ships it in dist/ with no copy step.
 // Changes from LLD v2: orders.delivered_at ("oldest due days" = age of the oldest unpaid bill)
 // and orders.confirmed_at (DSR counts bills cut per day).
+// v2: rooms (office vs field), payments.status (salesman cash waits for a manager), audit idem_scope.
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export const SCHEMA_SQL = `
 CREATE TABLE users (
   id             INTEGER PRIMARY KEY,
-  handle         TEXT NOT NULL UNIQUE,
+  handle         TEXT NOT NULL UNIQUE COLLATE NOCASE,
   participant_id TEXT UNIQUE,
   display_name   TEXT NOT NULL,
   role           TEXT NOT NULL CHECK (role IN ('salesman','manager','godown','delivery')),
@@ -97,8 +98,19 @@ CREATE TABLE payments (
   mode              TEXT NOT NULL CHECK (mode IN ('cash','upi','cheque','bank')),
   reference         TEXT,
   recorded_by       INTEGER NOT NULL REFERENCES users(id),
+  status            TEXT NOT NULL DEFAULT 'verified' CHECK (status IN ('pending','verified','rejected')),
+  verified_by       INTEGER REFERENCES users(id),
+  verified_at       TEXT,
   source_message_id TEXT NOT NULL,
   created_at        TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Manager and godown act only from an office room. The first office-role call binds the office
+-- room if none is bound yet (install time); npm run bind-room changes it.
+CREATE TABLE rooms (
+  room_id    TEXT PRIMARY KEY,
+  kind       TEXT NOT NULL CHECK (kind IN ('office','field')),
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE TABLE audit_log (
@@ -114,13 +126,14 @@ CREATE TABLE audit_log (
   room_id      TEXT,
   message_id   TEXT,
   request_hash TEXT,
+  idem_scope   TEXT NOT NULL DEFAULT '',
   args_json    TEXT,
   outcome      TEXT NOT NULL CHECK (outcome IN ('ok','refused','error')),
   error_code   TEXT,
   before_json  TEXT,
   after_json   TEXT
 );
-CREATE UNIQUE INDEX audit_idem_idx ON audit_log(message_id, action) WHERE outcome = 'ok';
+CREATE UNIQUE INDEX audit_idem_idx ON audit_log(message_id, action, idem_scope) WHERE outcome = 'ok';
 CREATE INDEX audit_actor_time_idx ON audit_log(actor_handle, at);
 
 CREATE TABLE counters (name TEXT PRIMARY KEY, value INTEGER NOT NULL);
@@ -128,6 +141,7 @@ CREATE TABLE counters (name TEXT PRIMARY KEY, value INTEGER NOT NULL);
 
 export const TABLES = [
   "audit_log",
+  "rooms",
   "payments",
   "order_items",
   "orders",

@@ -1,22 +1,20 @@
 #!/usr/bin/env node
 // PreToolUse (mcp__orderroom__.*): overwrite actor_handle / message_id / room_id with what Switch
-// said about the sender, and sign them so the MCP server can tell a hook-stamped call from a guess.
+// said about the sender, and sign them (with the tool name) so the MCP server can tell a
+// hook-stamped call from a guess. Every OrderRoom tool is stamped, reads included.
 // Fail closed: any unexpected error blocks the call (exit 2) instead of letting it through unstamped.
 import { hookLog, loadCtx, MAX_AGE_MS, readStdin, sign, stampKey } from "./switch-header.mjs";
 
-// Tools whose schema carries the stamp. Reads without identity pass through untouched.
-const FULL = new Set([
-  "create_order_draft",
-  "revise_order_draft",
-  "confirm_order",
+// When one turn batches messages from several people, the model would choose whose identity a
+// call carries. These tools then refuse outright; others need the exact message_id.
+const ONE_SENDER_ONLY = new Set([
   "approve_order",
   "reject_order",
-  "cancel_order",
-  "update_status",
-  "record_payment",
   "register_user",
+  "verify_payment",
+  "record_payment",
+  "cancel_order",
 ]);
-const ACTOR_ONLY = new Set(["daily_summary"]);
 const t0 = Date.now();
 let tool = "?";
 let session = null;
@@ -31,7 +29,6 @@ try {
   const input = await readStdin();
   session = input.session_id ?? null;
   tool = String(input.tool_name ?? "").replace(/^mcp__orderroom__/, "");
-  if (!FULL.has(tool) && !ACTOR_ONLY.has(tool)) process.exit(0);
 
   const ctx = loadCtx(input.session_id);
   if (!ctx || !Array.isArray(ctx.messages) || ctx.messages.length === 0) {
@@ -43,18 +40,31 @@ try {
     block("OrderRoom: the sender context is stale. Ask the person to send the message again.");
 
   const args = input.tool_input ?? {};
-  // The model may say which message it acts on (batched turns); the sender always comes from Switch.
-  const msg =
-    ctx.messages.find((m) => m.message_id === args.message_id) ??
-    ctx.messages[ctx.messages.length - 1];
-  const key = stampKey();
-  const updated = { ...args, actor_handle: msg.handle };
-  if (FULL.has(tool)) {
-    updated.message_id = msg.message_id;
-    updated.room_id = msg.room_id;
+  const senders = new Set(ctx.messages.map((m) => m.handle.toLowerCase()));
+  let msg;
+  if (senders.size === 1) {
+    msg =
+      ctx.messages.find((m) => m.message_id === args.message_id) ??
+      ctx.messages[ctx.messages.length - 1];
+  } else {
+    if (ONE_SENDER_ONLY.has(tool))
+      block(
+        `OrderRoom: ${senders.size} people wrote in this turn, so ${tool} is not allowed now. Ask the person to send that request again on its own.`,
+      );
+    msg = ctx.messages.find((m) => m.message_id === args.message_id);
+    if (!msg)
+      block(
+        "OrderRoom: several people wrote in this turn. Pass the exact message_id of the message you are acting on.",
+      );
   }
-  if (key)
-    updated.stamp_sig = sign(key, msg.handle, updated.message_id ?? "", updated.room_id ?? "");
+  const key = stampKey();
+  const updated = {
+    ...args,
+    actor_handle: msg.handle,
+    message_id: msg.message_id,
+    room_id: msg.room_id,
+  };
+  if (key) updated.stamp_sig = sign(key, tool, msg.handle, msg.message_id, msg.room_id);
 
   process.stdout.write(
     JSON.stringify({

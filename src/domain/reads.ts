@@ -158,7 +158,7 @@ export function listOpenOrders(
   a: {
     status?: string[];
     retailer_id?: number;
-    room_id?: string;
+    from_room_id?: string;
     response_format?: "concise" | "detailed";
   },
 ) {
@@ -171,9 +171,9 @@ export function listOpenOrders(
     sql += " AND o.retailer_id = ?";
     params.push(a.retailer_id);
   }
-  if (a.room_id) {
+  if (a.from_room_id) {
     sql += " AND o.room_id = ?";
-    params.push(a.room_id);
+    params.push(a.from_room_id);
   }
   sql += " ORDER BY CASE o.status WHEN 'needs_approval' THEN 0 ELSE 1 END, o.id DESC LIMIT 25";
   const rows = db.prepare(sql).all(...params) as {
@@ -218,12 +218,14 @@ export function dailySummary(
   db: DB,
   a: {
     actor_handle: string;
+    message_id?: string;
+    room_id?: string;
     stamp_sig?: string;
     date?: string;
     response_format?: "concise" | "detailed";
   },
 ) {
-  requireRole(db, a, READ_ROLES.daily_summary, "see the daily summary");
+  requireRole(db, a, READ_ROLES.daily_summary, "daily_summary", "see the daily summary");
   const day = a.date ?? today();
   const billed = db
     .prepare(
@@ -247,13 +249,18 @@ export function dailySummary(
   ).n;
   const pays = db
     .prepare(
-      `SELECT mode, SUM(amount) AS s FROM payments WHERE ${istDaySql("created_at")} = ? GROUP BY mode`,
+      `SELECT mode, SUM(amount) AS s FROM payments WHERE ${istDaySql("created_at")} = ? AND status = 'verified' GROUP BY mode`,
     )
     .all(day) as {
     mode: string;
     s: number;
   }[];
   const collection = pays.reduce((s, p) => s + p.s, 0);
+  const unverified = db
+    .prepare(
+      "SELECT p.id, r.name AS party, p.amount, p.mode FROM payments p JOIN retailers r ON r.id = p.retailer_id WHERE p.status = 'pending' ORDER BY p.id",
+    )
+    .all() as { id: number; party: string; amount: number; mode: string }[];
   const orderValue = billed.reduce((s, b) => s + b.total, 0);
   const pending = db
     .prepare(
@@ -295,6 +302,7 @@ export function dailySummary(
     collection_total: collection,
     collection_by_mode: Object.fromEntries(pays.map((p) => [p.mode, p.s])),
     pending_approval: pending,
+    payments_to_verify: unverified,
     overdue_parties: overdue,
     low_stock: low,
     over_limit_parties: overLimit,
@@ -302,6 +310,7 @@ export function dailySummary(
       `📊 DSR ${day}`,
       `Bills ${billed.length} · value ${rupees(orderValue)} · productive calls ${calls} · lines/bill ${lpb} · fill rate ${fill ?? "—"}%`,
       `Collection ${rupees(collection)}${pays.length ? ` (${pays.map((p) => `${p.mode} ${rupees(p.s)}`).join(", ")})` : ""}`,
+      `Payments to verify: ${unverified.length ? unverified.map((p) => `P${p.id} ${p.party} ${rupees(p.amount)} ${p.mode}`).join(", ") : "none"}`,
       `Approval pending: ${pending.length ? pending.map((p) => `#${p.id} ${p.party}`).join(", ") : "none"}`,
       `Overdue: ${overdue.length ? overdue.map((o) => `${o.name} ${o.oldest_due_days} d`).join(", ") : "none"}`,
       `Low stock: ${low.length ? low.map((l) => `${l.name} (${l.available})`).join(", ") : "none"}`,

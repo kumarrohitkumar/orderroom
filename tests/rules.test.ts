@@ -142,17 +142,130 @@ describe("approval flow", () => {
     expect(orderView(db, d.order_id).due_date).toBe("2026-11-26");
   });
 
-  it("payment reduces outstanding and keeps the oldest bill at 12 d", () => {
-    const p = ok<{ new_outstanding: number; oldest_due_days: number }>(
+  it("a salesman's payment waits for a manager; verified, it reduces outstanding (oldest bill 12 d)", () => {
+    const p = ok<{ payment_id: number; status: string; new_outstanding: number }>(
       writes.record_payment(db, {
-        ...as("ravi_sales"),
+        ...as("ravi_sales", "room-field"),
         retailer_id: SHARMA,
         amount_paise: 1_500_000,
         mode: "cash",
       }),
     );
-    expect(p.new_outstanding).toBe(2_350_000);
-    expect(p.oldest_due_days).toBe(12);
+    expect(p.status).toBe("pending");
+    expect(p.new_outstanding).toBe(3_850_000);
+    const denied = writes.verify_payment(db, {
+      ...as("ravi_sales", "room-field"),
+      payment_id: p.payment_id,
+      decision: "verify",
+    });
+    expect(!denied.ok && denied.error.code).toBe("FORBIDDEN_ROLE");
+    const v = ok<{ status: string; new_outstanding: number; oldest_due_days: number }>(
+      writes.verify_payment(db, {
+        ...as("amit_manager"),
+        payment_id: p.payment_id,
+        decision: "verify",
+      }),
+    );
+    expect(v.status).toBe("verified");
+    expect(v.new_outstanding).toBe(2_350_000);
+    expect(v.oldest_due_days).toBe(12);
+    const again = writes.verify_payment(db, {
+      ...as("amit_manager"),
+      payment_id: p.payment_id,
+      decision: "verify",
+    });
+    expect(!again.ok && again.error.code).toBe("INVALID_TRANSITION");
+  });
+
+  it("a claimed payment cannot unblock an over-limit order (no self-approval via revise)", () => {
+    const d = ok<DraftResult>(
+      writes.create_order_draft(db, {
+        ...as("ravi_sales", "room-field"),
+        retailer_id: SHARMA,
+        items: [
+          { product_id: NOODLES_70, qty_cases: 10 },
+          { product_id: GLUCOSE, qty_cases: 5 },
+        ],
+      }),
+    );
+    expect(d.status).toBe("needs_approval");
+    ok(
+      writes.record_payment(db, {
+        ...as("ravi_sales", "room-field"),
+        retailer_id: SHARMA,
+        amount_paise: 100_000_000,
+        mode: "cash",
+      }),
+    );
+    const r = ok<DraftResult>(
+      writes.revise_order_draft(db, {
+        ...as("ravi_sales", "room-field"),
+        order_id: d.order_id,
+        items: [
+          { product_id: NOODLES_70, qty_cases: 10 },
+          { product_id: GLUCOSE, qty_cases: 5 },
+        ],
+      }),
+    );
+    expect(r.status).toBe("needs_approval");
+  });
+});
+
+describe("rooms", () => {
+  it("office roles act only from the office room, so a renamed Telegram handle gets nothing", () => {
+    const d = ok<DraftResult>(
+      writes.create_order_draft(db, {
+        ...as("ravi_sales", "room-field"),
+        retailer_id: SHARMA,
+        items: [
+          { product_id: NOODLES_70, qty_cases: 10 },
+          { product_id: GLUCOSE, qty_cases: 5 },
+        ],
+      }),
+    );
+    // A fresh install binds the office room on the first office-role call.
+    expect(
+      writes.update_status(db, { ...as("suresh_wh"), order_id: 1045, status: "dispatched" }).ok,
+    ).toBe(true);
+    // "amit_manager" typed from the Telegram field room: same handle, wrong room.
+    const fake = writes.approve_order(db, {
+      ...as("amit_manager", "room-field"),
+      order_id: d.order_id,
+    });
+    expect(!fake.ok && fake.error.code).toBe("ROOM_NOT_ALLOWED");
+    const wh = writes.update_status(db, {
+      ...as("suresh_wh", "room-tg-new"),
+      order_id: 1044,
+      status: "delivered",
+    });
+    expect(!wh.ok && wh.error.code).toBe("ROOM_NOT_ALLOWED");
+    const real = writes.approve_order(db, {
+      ...as("amit_manager"),
+      order_id: d.order_id,
+      changes: [{ product_id: GLUCOSE, qty_confirmed: 3 }],
+    });
+    expect(real.ok ? "ok" : real.error).toBe("ok");
+  });
+
+  it("one message may draft for two parties, but not the same party twice", () => {
+    const m = as("ravi_sales", "room-field");
+    const a = writes.create_order_draft(db, {
+      ...m,
+      retailer_id: GUPTA,
+      items: [{ product_id: TEA, qty_cases: 2 }],
+    });
+    const b = writes.create_order_draft(db, {
+      ...m,
+      retailer_id: VERMA,
+      items: [{ product_id: TEA, qty_cases: 1 }],
+    });
+    expect(a.ok && b.ok).toBe(true);
+    const c = writes.create_order_draft(db, {
+      ...m,
+      retailer_id: GUPTA,
+      items: [{ product_id: TEA, qty_cases: 3 }],
+    });
+    expect(!c.ok && c.error.code).toBe("IDEMPOTENCY_CONFLICT");
   });
 });
 

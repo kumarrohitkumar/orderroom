@@ -3,7 +3,7 @@ import type { DB } from "../db/client.js";
 import { runWrite, type Stamp } from "./audit.js";
 import type { Role } from "./identity.js";
 import * as O from "./orders.js";
-import { recordPayment } from "./payments.js";
+import { recordPayment, verifyPayment } from "./payments.js";
 import { cleanText } from "./sanitize.js";
 import { registerUser } from "./users.js";
 
@@ -14,7 +14,7 @@ export const writes = {
     db: DB,
     a: In<{ retailer_id: number; items: O.ItemInput[]; note?: string }>,
   ) =>
-    runWrite(db, { action: "create_order_draft", entity: "order" }, a, (c) =>
+    runWrite(db, { action: "create_order_draft", entity: "order", scope: a.retailer_id }, a, (c) =>
       O.createDraft(c, { ...a, note: cleanText(a.note, "note") }),
     ),
   revise_order_draft: (db: DB, a: In<{ order_id: number; items: O.ItemInput[] }>) =>
@@ -73,6 +73,15 @@ export const writes = {
       a,
       (c) => recordPayment(c, { ...a, reference: cleanText(a.reference, "reference", 64) }),
     ),
+  verify_payment: (db: DB, a: In<{ payment_id: number; decision: "verify" | "reject" }>) =>
+    runWrite(db, { action: "verify_payment", entity: "payment", entityId: a.payment_id }, a, (c) =>
+      verifyPayment(c, a),
+    ),
   register_user: (db: DB, a: In<{ target_handle: string; display_name: string; role: Role }>) =>
-    runWrite(db, { action: "register_user", entity: "user" }, a, (c) => registerUser(c, a)),
+    runWrite(
+      db,
+      { action: "register_user", entity: "user", scope: a.target_handle.toLowerCase() },
+      a,
+      (c) => registerUser(c, a),
+    ),
 };

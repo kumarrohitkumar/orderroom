@@ -1,11 +1,12 @@
 // npm run setup: (build already ran) → agent/.mcp.json with absolute paths → stamp key → seed → selfcheck.
-// Idempotent: reseeds from scratch unless --keep.
+// Idempotent: keeps existing data; reseeds on --reset or when the schema version changed.
 import { spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { dataDir, dbPath, openDb, REPO_ROOT } from "../src/db/client.js";
 import { ensureSchema } from "../src/db/migrate.js";
+import { SCHEMA_VERSION } from "../src/db/schema.js";
 import { seed } from "../src/db/seed.js";
 
 const t0 = Date.now();
@@ -57,11 +58,12 @@ if (!existsSync(keyFile)) {
   console.log("[setup] created stamp key");
 }
 
-// 3. Database.
+// 3. Database. Re-running setup keeps real orders; --reset (or a schema change) reseeds the demo.
 const db = openDb(dbPath(data));
-if (process.argv.includes("--keep")) {
+const version = db.pragma("user_version", { simple: true }) as number;
+if (version === SCHEMA_VERSION && !process.argv.includes("--reset")) {
   ensureSchema(db);
-  console.log(`[setup] kept existing data in ${dbPath(data)}`);
+  console.log(`[setup] kept existing data in ${dbPath(data)} (npm run setup -- --reset to reseed)`);
 } else {
   const c = seed(db);
   console.log(

@@ -16,10 +16,14 @@ const HEADER =
 const BEGIN = /BEGIN SWITCH MESSAGE\s*(\S*)/;
 const END = /END SWITCH MESSAGE\s*(\S*)/;
 
-/** All headers in prompt order, skipping anything inside a message body. */
+/**
+ * All headers in prompt order, skipping anything inside a message body. A header counts only when
+ * the next line opens a body (BEGIN SWITCH MESSAGE <nonce>), the shape Switch always sends.
+ */
 export function parseHeaders(prompt) {
   const out = [];
   let nonce = null; // inside a body until END with the same nonce
+  let pending = null; // a header line waiting for its BEGIN on the next line
   for (const raw of String(prompt ?? "").split(/\r?\n/)) {
     const line = raw.trim();
     if (nonce !== null) {
@@ -29,18 +33,20 @@ export function parseHeaders(prompt) {
     }
     const b = BEGIN.exec(line);
     if (b) {
+      if (pending) out.push(pending);
+      pending = null;
       nonce = b[1] ?? "";
       continue;
     }
     const h = HEADER.exec(line);
-    if (h) {
-      out.push({
-        handle: h[1].replace(/^@/, ""),
-        room_id: h[2],
-        message_id: h[3],
-        thread_id: h[4] === "none" ? null : h[4],
-      });
-    }
+    pending = h
+      ? {
+          handle: h[1].replace(/^@/, ""),
+          room_id: h[2],
+          message_id: h[3],
+          thread_id: h[4] === "none" ? null : h[4],
+        }
+      : null;
   }
   return out;
 }
@@ -66,8 +72,10 @@ export function stampKey() {
 }
 
 /** Must match src/domain/stamp.ts. */
-export function sign(key, handle, messageId, roomId) {
-  return createHmac("sha256", key).update(`${handle}\n${messageId}\n${roomId}`).digest("hex");
+export function sign(key, tool, handle, messageId, roomId) {
+  return createHmac("sha256", key)
+    .update(`${tool}\n${handle}\n${messageId}\n${roomId}`)
+    .digest("hex");
 }
 
 export async function readStdin() {

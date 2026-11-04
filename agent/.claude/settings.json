@@ -80,6 +80,16 @@
             "timeout": 15
           }
         ]
+      },
+      {
+        "matcher": "mcp__switch__send_attachment",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-attachment.mjs\"",
+            "timeout": 15
+          }
+        ]
       }
     ]
   }

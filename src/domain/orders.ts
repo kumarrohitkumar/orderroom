@@ -818,14 +818,20 @@ export function updateStatus(
         "Return ka reason batao: damage, expiry, wrong_sku ya refused.",
       );
     }
-    const back = db.prepare("UPDATE stock SET on_hand = on_hand + ? WHERE product_id = ?");
-    for (const it of its) {
-      const q = (it.qty_confirmed ?? 0) + it.qty_free;
-      if (q > 0) back.run(q, it.product_id);
+    // Damaged or expired cases must not go back on sale; only refused / wrong-SKU goods are sellable.
+    const sellable = a.return_reason === "refused" || a.return_reason === "wrong_sku";
+    if (sellable) {
+      const back = db.prepare("UPDATE stock SET on_hand = on_hand + ? WHERE product_id = ?");
+      for (const it of its) {
+        const q = (it.qty_confirmed ?? 0) + it.qty_free;
+        if (q > 0) back.run(q, it.product_id);
+      }
     }
     db.prepare("UPDATE orders SET return_reason = ? WHERE id = ?").run(a.return_reason, o.id);
-    extra.stock_effect = "stock back in godown";
-    line = ` · ${a.return_reason}, stock wapas`;
+    extra.stock_effect = sellable ? "stock back in godown" : "written off, not restocked";
+    line = sellable
+      ? ` · ${a.return_reason}, stock wapas`
+      : ` · ${a.return_reason}, stock write-off`;
   }
   db.prepare("UPDATE orders SET status = ?, updated_at = ? WHERE id = ?").run(a.status, ts, o.id);
   const r = getRetailer(db, o.retailer_id);

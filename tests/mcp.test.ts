@@ -38,12 +38,16 @@ async function call(
   return { env, isError: Boolean(r.isError) };
 }
 let m = 0;
-const s = (h: string) => ({ actor_handle: h, message_id: `c-${++m}`, room_id: "room-test" });
+const s = (h: string, room = "room-test") => ({
+  actor_handle: h,
+  message_id: `c-${++m}`,
+  room_id: room,
+});
 
 describe("MCP contract", () => {
-  it("lists 17 tools with descriptions, schemas and annotations", async () => {
+  it("lists 18 tools with descriptions, schemas and annotations", async () => {
     const { tools } = await client.listTools();
-    expect(tools).toHaveLength(17);
+    expect(tools).toHaveLength(18);
     for (const t of tools) {
       expect(t.description && t.description.length > 80).toBe(true);
       expect(t.outputSchema).toBeDefined();
@@ -65,11 +69,14 @@ describe("MCP contract", () => {
   });
 
   it("runs the demo through the tool surface and writes a PDF bill", async () => {
-    const party = await call("find_retailer", { query: "Sharma store" });
+    const party = await call("find_retailer", {
+      ...s("ravi_sales", "room-field"),
+      query: "Sharma store",
+    });
     const rid = (party.env.data?.matches as { id: number }[] | undefined)?.[0]?.id;
     expect(rid).toBe(1);
     const draft = await call("create_order_draft", {
-      ...s("ravi_sales"),
+      ...s("ravi_sales", "room-field"),
       retailer_id: rid,
       items: [
         { product_id: 1, qty_cases: 10 },
@@ -107,13 +114,15 @@ describe("MCP contract", () => {
   });
 
   it("NOT_FOUND is a tool error; FORBIDDEN on the DSR is not", async () => {
-    const nf = await call("get_order", { order_id: 9999 });
+    const anon = await call("get_order", { ...s("stranger"), order_id: 1045 });
+    expect(anon.env.error?.code).toBe("UNKNOWN_ACTOR");
+    const nf = await call("get_order", { ...s("ravi_sales"), order_id: 9999 });
     expect(nf.env.error?.code).toBe("NOT_FOUND");
     expect(nf.isError).toBe(true);
-    const dsr = await call("daily_summary", { actor_handle: "ravi_sales" });
+    const dsr = await call("daily_summary", s("ravi_sales"));
     expect(dsr.env.error?.code).toBe("FORBIDDEN_ROLE");
     expect(dsr.isError).toBe(false);
-    const ok = await call("daily_summary", { actor_handle: "amit_manager" });
+    const ok = await call("daily_summary", s("amit_manager"));
     expect(String(ok.env.data?.reply_text)).toContain("DSR");
   });
 });

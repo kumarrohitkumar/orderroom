@@ -15,6 +15,7 @@ export type ErrorCode =
   | "IDEMPOTENCY_CONFLICT"
   | "ALREADY_REGISTERED"
   | "UNSTAMPED"
+  | "ROOM_NOT_ALLOWED"
   | "VOICE_UNAVAILABLE";
 
 export const TOOL_ERROR_CODES: ReadonlySet<ErrorCode> = new Set([
