@@ -119,6 +119,9 @@ Planning docs ([PLAN.md](PLAN.md), [docs/](docs/)) were written before Nov 4. Ev
 - Audio attachments are not delivered automatically, so voice notes need an explicit `read_context` → `download_attachment` round trip.
 - One session per room means the field room does not hear about an approval made in the office room. A first-class "notify another room" tool would make cross-room workflows simpler.
 - A `tools` / `disallowedTools` example in TEMPLATES.md would save time.
+- Switch merges ~60 of its own tools into every agent, including room, agent and template admin. A per-template "chat tools only" preset would help agents placed in non-technical rooms. OrderRoom denies 29 admin tools by name.
+- The same person gets a different sender name per app (Mattermost `user`, Console chat `Admin`). A stable per-person id in the header would let tools map people once.
+- Two bugs found while building, written up in [docs/switch-feedback/](docs/switch-feedback/): the template form pre-fills a `directory` param with the literal `{directory}`, and the Mattermost bridge does not come back after Docker restarts.
 
 ## Limits and future work
 
