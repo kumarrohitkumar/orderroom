@@ -22,7 +22,8 @@
     "mcp": "node dist/mcp/server.js",
     "template": "tsx scripts/build-template.ts",
     "clean-room": "bash scripts/clean-room.sh",
-    "simulate": "npm run build && tsx scripts/simulate.ts"
+    "simulate": "npm run build && tsx scripts/simulate.ts",
+    "add-user": "tsx scripts/add-user.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.6.4",

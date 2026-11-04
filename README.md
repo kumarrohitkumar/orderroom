@@ -44,6 +44,8 @@ Measured on a fresh clone: **7 s** from `git clone` to a seeded, self-checked se
 
 Then in Switch Console: **Templates → Import template →** `switch/orderroom.template.yaml` **→ Use**, with *directory* set to the `agent/` path that `npm run setup` printed. The form pre-fills that box with the literal text `{directory}`: clear it and paste the bare path, with no braces, or the agent will not start ("not an absolute path"). The template creates the agent, its settings and the office room, and posts a kickoff message that the agent answers.
 
+**Register yourself.** Send `@desk hi` in the office room. The agent replies that `<your name>` is not registered: that is the name Switch gives you (it can differ per app, e.g. Mattermost `user` vs Console chat `Admin`). Run `npm run add-user -- <your name> manager`.
+
 For the Telegram field room: create a bot with BotFather, turn **Group Privacy off**, add the bot to your salesmen's group (Telegram cannot create chats, so this room is adopted), and invite the agent with `/invite_agent @orderroom-agent`.
 
 **Try it without Switch.** `npm run simulate` feeds the agent (real Claude Code, in `agent/`) the 12-step demo in Switch's message format and writes what it would have posted to `data/sim-room.log`. It costs about $1.60 on Sonnet.
